@@ -27,12 +27,6 @@ try:
 except ImportError:
     HAS_XGBOOST = False
 
-import importlib
-try:
-    torch = importlib.import_module("torch")
-    HAS_TORCH = True
-except ImportError:
-    HAS_TORCH = False
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -193,11 +187,15 @@ def _tune_and_train(model_class, model_name, X_train, y_train, problem_type):
             "verbosity": 0, 
             "use_label_encoder": False
         }
-        # Try to use GPU if available
-        if HAS_TORCH:
-            if torch.cuda.is_available():
-                extra_kwargs["device"] = "cuda"
-                extra_kwargs["tree_method"] = "hist"
+        # Try to use GPU if available (XGBoost native CUDA detection)
+        try:
+            import xgboost as _xgb
+            _test = _xgb.XGBClassifier(device="cuda", n_estimators=1)
+            _test.fit([[0]], [0])
+            extra_kwargs["device"] = "cuda"
+            extra_kwargs["tree_method"] = "hist"
+        except Exception:
+            pass
 
     if not param_grid:
         # No tuning needed (e.g. LinearRegression)

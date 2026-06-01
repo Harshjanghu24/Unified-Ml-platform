@@ -21,12 +21,6 @@ from ..ml.eda import (
 )
 from ..database import save_model_record
 
-import importlib
-try:
-    torch = importlib.import_module("torch")
-    HAS_TORCH = True
-except ImportError:
-    HAS_TORCH = False
 
 router = APIRouter(prefix="/api", tags=["Training"])
 
@@ -272,14 +266,21 @@ async def get_system_info():
         "vram": "N/A"
     }
 
-    if HAS_TORCH:
-        if torch.cuda.is_available():
+    # Detect GPU via nvidia-smi (no torch dependency required)
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total,memory.used", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            parts = result.stdout.strip().split(", ")
             info["cuda_status"] = True
-            info["gpu"] = torch.cuda.get_device_name(0)
-            
-            # Get VRAM
-            total_vram = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-            allocated_vram = torch.cuda.memory_allocated(0) / (1024**3)
-            info["vram"] = f"{round(allocated_vram, 2)}GB / {round(total_vram, 2)}GB"
+            info["gpu"] = parts[0]
+            total_vram = float(parts[1]) / 1024  # Convert MB to GB
+            used_vram = float(parts[2]) / 1024
+            info["vram"] = f"{round(used_vram, 2)}GB / {round(total_vram, 2)}GB"
+    except Exception:
+        pass
         
     return info

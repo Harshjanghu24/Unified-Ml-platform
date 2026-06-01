@@ -12,3 +12,4 @@ shap
 fpdf2
 scipy
 xgboost
+psutil
