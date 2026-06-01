@@ -21,8 +21,9 @@ from ..ml.eda import (
 )
 from ..database import save_model_record
 
+import importlib
 try:
-    import torch
+    torch = importlib.import_module("torch")
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False

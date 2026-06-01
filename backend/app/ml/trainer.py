@@ -27,8 +27,9 @@ try:
 except ImportError:
     HAS_XGBOOST = False
 
+import importlib
 try:
-    import torch
+    torch = importlib.import_module("torch")
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
