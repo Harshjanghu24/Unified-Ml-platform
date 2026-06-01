@@ -21,6 +21,12 @@ from ..ml.eda import (
 )
 from ..database import save_model_record
 
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
 router = APIRouter(prefix="/api", tags=["Training"])
 
 # In-memory store for training results and background jobs
@@ -265,8 +271,7 @@ async def get_system_info():
         "vram": "N/A"
     }
 
-    try:
-        import torch  # type: ignore
+    if HAS_TORCH:
         if torch.cuda.is_available():
             info["cuda_status"] = True
             info["gpu"] = torch.cuda.get_device_name(0)
@@ -275,7 +280,5 @@ async def get_system_info():
             total_vram = torch.cuda.get_device_properties(0).total_memory / (1024**3)
             allocated_vram = torch.cuda.memory_allocated(0) / (1024**3)
             info["vram"] = f"{round(allocated_vram, 2)}GB / {round(total_vram, 2)}GB"
-    except ImportError:
-        pass
         
     return info

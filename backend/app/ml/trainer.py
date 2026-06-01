@@ -27,6 +27,12 @@ try:
 except ImportError:
     HAS_XGBOOST = False
 
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -187,13 +193,10 @@ def _tune_and_train(model_class, model_name, X_train, y_train, problem_type):
             "use_label_encoder": False
         }
         # Try to use GPU if available
-        try:
-            import torch  # type: ignore
+        if HAS_TORCH:
             if torch.cuda.is_available():
                 extra_kwargs["device"] = "cuda"
                 extra_kwargs["tree_method"] = "hist"
-        except ImportError:
-            pass
 
     if not param_grid:
         # No tuning needed (e.g. LinearRegression)
