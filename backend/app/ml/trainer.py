@@ -79,11 +79,20 @@ def _evaluate_classifier(model, X_test, y_test, n_classes):
     y_pred = model.predict(X_test)
     average = "binary" if n_classes == 2 else "weighted"
 
+    # Dynamically determine pos_label for binary classification if labels are strings
+    kwargs = {"average": average, "zero_division": 0}
+    if average == "binary":
+        unique_vals = list(set(y_test))
+        if 1 in unique_vals:
+            kwargs["pos_label"] = 1
+        else:
+            kwargs["pos_label"] = unique_vals[-1] if unique_vals else 1
+
     metrics = {
         "accuracy": round(float(accuracy_score(y_test, y_pred)), 4),
-        "precision": round(float(precision_score(y_test, y_pred, average=average, zero_division=0)), 4),
-        "recall": round(float(recall_score(y_test, y_pred, average=average, zero_division=0)), 4),
-        "f1_score": round(float(f1_score(y_test, y_pred, average=average, zero_division=0)), 4),
+        "precision": round(float(precision_score(y_test, y_pred, **kwargs)), 4),
+        "recall": round(float(recall_score(y_test, y_pred, **kwargs)), 4),
+        "f1_score": round(float(f1_score(y_test, y_pred, **kwargs)), 4),
     }
 
     # ROC-AUC
@@ -172,8 +181,19 @@ def _tune_and_train(model_class, model_name, X_train, y_train, problem_type):
     # XGBoost models need special kwargs
     extra_kwargs = {}
     if "XGB" in model_name:
-        extra_kwargs = {"eval_metric": "logloss" if problem_type != "regression" else "rmse",
-                        "verbosity": 0, "use_label_encoder": False}
+        extra_kwargs = {
+            "eval_metric": "logloss" if problem_type != "regression" else "rmse",
+            "verbosity": 0, 
+            "use_label_encoder": False
+        }
+        # Try to use GPU if available
+        try:
+            import torch  # type: ignore
+            if torch.cuda.is_available():
+                extra_kwargs["device"] = "cuda"
+                extra_kwargs["tree_method"] = "hist"
+        except ImportError:
+            pass
 
     if not param_grid:
         # No tuning needed (e.g. LinearRegression)

@@ -95,7 +95,7 @@ async def predict(input_data: PredictionInput):
             X_train = dataset.get("df")
             if X_train is not None:
                 from ..ml.preprocessor import build_preprocessing_pipeline
-                prep = build_preprocessing_pipeline(X_train, pipeline["target_column"])
+                prep = build_preprocessing_pipeline(X_train, pipeline["target_column"], problem_type)
                 explanation = explain_single_prediction(
                     model, processed, prep["X_train"], feature_names, problem_type
                 )

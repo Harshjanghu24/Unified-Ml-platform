@@ -1,13 +1,13 @@
-"""
-Dataset API Routes.
-Handles CSV upload, dataset analysis, target recommendations, and target selection.
+# """
+# Dataset API Routes.
+# Handles CSV upload, dataset analysis, target recommendations, and target selection.
 
-Workflow:
-  1. POST /upload-dataset     → Upload CSV (no target column needed)
-  2. POST /analyze-columns    → Analyze all columns for target suitability
-  3. GET  /target-recommendations → Get ranked target recommendations
-  4. POST /select-target      → User selects a target column
-"""
+# Workflow:
+#   1. POST /upload-dataset     → Upload CSV (no target column needed)
+#   2. POST /analyze-columns    → Analyze all columns for target suitability
+#   3. GET  /target-recommendations → Get ranked target recommendations
+#   4. POST /select-target      → User selects a target column
+# """
 
 import os
 import pandas as pd
@@ -26,7 +26,30 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def get_current_dataset():
-    """Access the current dataset state from other modules."""
+    """Access the current dataset state from other modules, auto-restoring from DB if needed."""
+    if _current_dataset.get("df") is None:
+        record = get_latest_dataset()
+        if record:
+            filename = record.get("filename")
+            filepath = os.path.join(UPLOAD_DIR, filename)
+            if os.path.exists(filepath):
+                try:
+                    df = None
+                    for encoding in ["utf-8", "latin1", "cp1252", "utf-8-sig"]:
+                        try:
+                            df = pd.read_csv(filepath, encoding=encoding, low_memory=False)
+                            break
+                        except Exception:
+                            continue
+                    if df is not None:
+                        _current_dataset["df"] = df
+                        _current_dataset["filename"] = filename
+                        _current_dataset["filepath"] = filepath
+                        _current_dataset["target_column"] = record.get("target_column")
+                        _current_dataset["problem_type"] = record.get("problem_type")
+                        _current_dataset["dataset_id"] = record.get("id")
+                except Exception as e:
+                    print(f"[WARNING] Failed to auto-restore dataset from disk: {e}")
     return _current_dataset
 
 
@@ -35,25 +58,41 @@ async def upload_dataset(file: UploadFile = File(...)):
     """
     Step 1: Upload a CSV dataset WITHOUT specifying a target column.
 
-    - Saves the file to disk
-    - Reads it with Pandas
+    - Saves the file to disk streaming in chunks to prevent high memory usage
+    - Reads it with Pandas trying multiple common encodings
     - Computes basic summary statistics
     - Stores in memory for subsequent analysis
     """
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported.")
 
-    # Save file
+    # Save file in chunks to prevent high memory usage
     filepath = os.path.join(UPLOAD_DIR, file.filename)
-    content = await file.read()
-    with open(filepath, "wb") as f:
-        f.write(content)
-
-    # Read dataset
     try:
-        df = pd.read_csv(filepath)
+        with open(filepath, "wb") as f:
+            while chunk := await file.read(1024 * 1024):  # 1MB chunks
+                f.write(chunk)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error saving uploaded file: {str(e)}")
+
+    # Read dataset with fallback encodings to support non-UTF-8 datasets (e.g. latin1, cp1252)
+    df = None
+    encodings_to_try = ["utf-8", "latin1", "cp1252", "utf-8-sig"]
+    last_error = None
+    for encoding in encodings_to_try:
+        try:
+            df = pd.read_csv(filepath, encoding=encoding, low_memory=False)
+            break
+        except UnicodeDecodeError as e:
+            last_error = e
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}")
+
+    if df is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unicode decode error. Failed to read CSV with common encodings. Detail: {str(last_error)}"
+        )
 
     if df.empty:
         raise HTTPException(status_code=400, detail="The uploaded CSV file is empty.")
@@ -73,8 +112,8 @@ async def upload_dataset(file: UploadFile = File(...)):
         "categorical_columns": df.select_dtypes(include=["object", "category"]).columns.tolist(),
     }
 
-    # Preview (first 10 rows)
-    preview = df.head(10).fillna("").to_dict(orient="records")
+    # Preview (first 10 rows) - cast to object first to prevent pandas fillna type conflicts
+    preview = df.head(10).astype(object).fillna("").to_dict(orient="records")
 
     # Store in memory (no target column yet)
     _current_dataset["df"] = df

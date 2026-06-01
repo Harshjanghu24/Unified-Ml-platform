@@ -1,30 +1,73 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { HiBeaker, HiCheckCircle, HiCog } from 'react-icons/hi';
-import { trainModels } from '../services/api.js';
+import { HiBeaker, HiCheckCircle, HiCog, HiServer } from 'react-icons/hi';
+import { trainModels, getTrainStatus, getTrainResult, getSystemInfo } from '../services/api.js';
 
 export default function TrainingPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [elapsed, setElapsed] = useState(0);
+  const [progressText, setProgressText] = useState('');
+  const [sysInfo, setSysInfo] = useState(null);
+
+  useEffect(() => {
+    // Fetch system info
+    const fetchSysInfo = async () => {
+      try {
+        const { data } = await getSystemInfo();
+        setSysInfo(data);
+      } catch (e) {
+        console.error("Failed to load system info", e);
+      }
+    };
+    fetchSysInfo();
+    const sysTimer = setInterval(fetchSysInfo, 10000);
+    return () => clearInterval(sysTimer);
+  }, []);
 
   const handleTrain = async () => {
     setLoading(true);
     setResult(null);
     setElapsed(0);
+    setProgressText('Initializing pipeline...');
 
     const timer = setInterval(() => setElapsed((e) => e + 1), 1000);
 
     try {
       const { data } = await trainModels();
-      setResult(data);
-      toast.success(`Training complete! Best model: ${data.best_model}`);
+      const jobId = data.job_id;
+
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await getTrainStatus(jobId);
+          if (statusRes.data.status === 'completed') {
+            clearInterval(pollInterval);
+            clearInterval(timer);
+            const resultRes = await getTrainResult(jobId);
+            setResult(resultRes.data);
+            toast.success(`Training complete! Best model: ${resultRes.data.best_model}`);
+            setLoading(false);
+          } else if (statusRes.data.status === 'failed') {
+            clearInterval(pollInterval);
+            clearInterval(timer);
+            toast.error(statusRes.data.error || 'Training failed.');
+            setLoading(false);
+          } else {
+            setProgressText(statusRes.data.progress || 'Running...');
+          }
+        } catch (err) {
+            clearInterval(pollInterval);
+            clearInterval(timer);
+            toast.error('Failed to get training status.');
+            setLoading(false);
+        }
+      }, 2000);
+
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Training failed. Make sure a dataset is uploaded.');
-    } finally {
       clearInterval(timer);
       setLoading(false);
+      toast.error(err.response?.data?.detail || 'Training failed to start.');
     }
   };
 
@@ -38,11 +81,43 @@ export default function TrainingPage() {
           <div>
             <h1 style={{ fontSize: '1.8rem', fontWeight: 800 }}>Model Training</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-              Train models with automatic hyperparameter tuning and cross-validation
+              Train models asynchronously with automatic hyperparameter tuning and cross-validation
             </p>
           </div>
         </div>
       </motion.div>
+
+      {/* System Info */}
+      {sysInfo && (
+        <motion.div
+          className="glass-card"
+          style={{ padding: '20px', marginBottom: '24px', display: 'flex', gap: '20px', alignItems: 'center' }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <HiServer style={{ fontSize: '2rem', color: 'var(--accent-indigo)' }} />
+          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', flex: 1 }}>
+            <div>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>CPU</span>
+              <div style={{ fontWeight: 600 }}>{sysInfo.cpu}</div>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>RAM</span>
+              <div style={{ fontWeight: 600 }}>{sysInfo.ram}</div>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>GPU</span>
+              <div style={{ fontWeight: 600 }}>{sysInfo.gpu}</div>
+            </div>
+            {sysInfo.cuda_status && (
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>VRAM</span>
+                <div style={{ fontWeight: 600 }}>{sysInfo.vram}</div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* Train Button */}
       <motion.div
@@ -61,10 +136,10 @@ export default function TrainingPage() {
             <p style={{ color: 'var(--text-muted)', marginBottom: '24px', maxWidth: '500px', margin: '0 auto 24px' }}>
               This will preprocess your data, run feature selection, train multiple models
               with hyperparameter tuning (GridSearchCV), perform 5-Fold Cross Validation,
-              and generate SHAP explanations.
+              and generate SHAP explanations. Training is async to prevent UI freezes.
             </p>
             <button className="btn-primary" onClick={handleTrain} style={{ fontSize: '1rem', padding: '14px 40px' }}>
-              <HiBeaker /> Start Training Pipeline
+              <HiBeaker /> Start Background Training
             </button>
           </>
         )}
@@ -73,10 +148,10 @@ export default function TrainingPage() {
           <>
             <div className="spinner pulse-glow" style={{ margin: '0 auto 20px', width: '60px', height: '60px', borderWidth: '4px' }} />
             <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>Training in Progress...</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>
-              Preprocessing → Feature Selection → Model Training → Cross Validation → SHAP Analysis
+            <p style={{ color: 'var(--accent-indigo)', fontWeight: 600, fontSize: '1.2rem', marginBottom: '8px' }}>
+              {progressText}
             </p>
-            <p style={{ color: 'var(--accent-indigo)', fontWeight: 600, fontSize: '1.2rem' }}>
+            <p style={{ color: 'var(--text-muted)' }}>
               {elapsed}s elapsed
             </p>
           </>

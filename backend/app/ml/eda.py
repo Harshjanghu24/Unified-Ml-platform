@@ -210,9 +210,11 @@ def generate_confusion_matrix_plot(confusion_mat, class_labels=None):
     fig, ax = plt.subplots(figsize=(8, 6))
 
     cm = np.array(confusion_mat)
+    xticklabels = class_labels if class_labels is not None else "auto"
+    yticklabels = class_labels if class_labels is not None else "auto"
     sns.heatmap(cm, annot=True, fmt="d", cmap="viridis", ax=ax,
                 linewidths=1, linecolor=GRID_COLOR,
-                xticklabels=class_labels, yticklabels=class_labels)
+                xticklabels=xticklabels, yticklabels=yticklabels)
     ax.set_xlabel("Predicted", fontsize=12)
     ax.set_ylabel("Actual", fontsize=12)
     ax.set_title("Confusion Matrix", fontsize=14, fontweight="bold")
@@ -231,7 +233,11 @@ def generate_roc_curve(model, X_test, y_test, n_classes):
 
     if n_classes == 2:
         y_proba = model.predict_proba(X_test)[:, 1]
-        fpr, tpr, _ = roc_curve(y_test, y_proba)
+        
+        unique_vals = list(set(y_test))
+        pos_label = 1 if 1 in unique_vals else (unique_vals[-1] if unique_vals else 1)
+        
+        fpr, tpr, _ = roc_curve(y_test, y_proba, pos_label=pos_label)
         roc_auc = auc(fpr, tpr)
 
         ax.plot(fpr, tpr, color=ACCENT_COLOR, lw=2, label=f"ROC Curve (AUC = {roc_auc:.3f})")

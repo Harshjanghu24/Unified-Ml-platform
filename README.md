@@ -148,7 +148,7 @@ venv\Scripts\activate
 pip install -r requirements.txt
 
 # Start the FastAPI backend server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --reload-exclude "app/data/*" --host 0.0.0.0 --port 8000
 ```
 
 The backend will run at **http://localhost:8000**  
