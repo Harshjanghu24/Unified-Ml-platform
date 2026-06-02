@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     version: str = "1.0.0"
     db_path: str = "data/platform.db"
     log_level: str = "INFO"
+    testing: bool = False
     
     model_config = SettingsConfigDict(env_file=".env")
 

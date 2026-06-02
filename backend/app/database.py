@@ -13,20 +13,22 @@ from .config import get_settings
 
 def get_db_path():
     settings = get_settings()
+    path = settings.db_path
+    if settings.testing:
+        path = "data/test_platform.db"
+    
     base_dir = os.path.dirname(os.path.dirname(__file__))
-    if os.path.isabs(settings.db_path):
-        return settings.db_path
-    return os.path.join(base_dir, settings.db_path)
-
-
-DB_PATH = get_db_path()
+    if os.path.isabs(path):
+        return path
+    return os.path.join(base_dir, path)
 
 
 def get_connection():
 
     """Get a SQLite connection with row_factory enabled."""
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
