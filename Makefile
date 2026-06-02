@@ -1,7 +1,7 @@
 .PHONY: install test lint run-backend run-frontend clean
 
 install:
-	cd backend && pip install -r requirements.txt
+	cd backend && pip install -r requirements.txt && pip install -r requirements-dev.txt
 	cd frontend && npm install
 
 test:
