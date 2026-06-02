@@ -13,14 +13,17 @@ from contextlib import asynccontextmanager
 
 from .database import init_db
 from .routes import dataset, training, prediction, models
+from .logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
     init_db()
-    print("[OK] Database initialized")
-    print("[READY] Unified Supervised Learning Platform is ready!")
+    logger.info("Database initialized")
+    logger.info("Unified Supervised Learning Platform is ready!")
     yield
 
 

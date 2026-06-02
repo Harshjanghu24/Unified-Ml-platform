@@ -27,6 +27,9 @@ try:
 except ImportError:
     HAS_XGBOOST = False
 
+from ..logger import setup_logger
+logger = setup_logger(__name__)
+
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -239,6 +242,7 @@ def train_models(X_train, X_test, y_train, y_test, problem_type):
         List of dicts, each containing:
           model_name, model_object, metrics, training_time, best_params, cv_scores, is_best
     """
+    logger.info(f"Starting model training for problem type: {problem_type}")
     # Define models per problem type
     if problem_type == "binary":
         model_configs = [
@@ -267,6 +271,7 @@ def train_models(X_train, X_test, y_train, y_test, problem_type):
     n_classes = int(y_train.nunique()) if problem_type != "regression" else 0
 
     for model_name, model_class in model_configs:
+        logger.info(f"Training model: {model_name}")
         start_time = time.time()
 
         # Hyperparameter tuning
@@ -304,4 +309,5 @@ def train_models(X_train, X_test, y_train, y_test, problem_type):
     for i, r in enumerate(results):
         r["is_best"] = (i == best_idx)
 
+    logger.info(f"Completed training for {len(results)} models. Best model: {results[best_idx]['model_name']}")
     return results
