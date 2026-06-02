@@ -102,6 +102,7 @@ backend/app/data/models/*
 !backend/app/data/models/.gitkeep
 backend/app/data/reports/*
 !backend/app/data/reports/.gitkeep
+backend/mlruns/
 
 # ── Misc ─────────────────────────────────────────────────────
 .cache/
