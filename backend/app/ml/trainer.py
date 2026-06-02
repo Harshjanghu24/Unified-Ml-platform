@@ -36,6 +36,7 @@ try:
     HAS_MLFLOW = True
 except ImportError:
     HAS_MLFLOW = False
+    mlflow = None
 
 from ..logger import setup_logger
 logger = setup_logger(__name__)
