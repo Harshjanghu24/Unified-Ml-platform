@@ -8,11 +8,22 @@ import sqlite3
 import os
 import json
 from datetime import datetime
+from .config import get_settings
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "platform.db")
+
+def get_db_path():
+    settings = get_settings()
+    base_dir = os.path.dirname(os.path.dirname(__file__))
+    if os.path.isabs(settings.db_path):
+        return settings.db_path
+    return os.path.join(base_dir, settings.db_path)
+
+
+DB_PATH = get_db_path()
 
 
 def get_connection():
+
     """Get a SQLite connection with row_factory enabled."""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
