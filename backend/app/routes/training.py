@@ -249,7 +249,7 @@ async def get_eda():
                 )
                 return {"plots": eda_plots}
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"EDA generation failed: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"EDA generation failed: {str(e)}") from e
         raise HTTPException(status_code=404, detail="No dataset or training data available.")
 
     return {"plots": _training_state["eda_plots"]}

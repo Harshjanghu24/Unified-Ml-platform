@@ -74,7 +74,7 @@ async def generate_pdf_report():
             plots=all_plots,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}") from e
 
     return FileResponse(
         filepath,

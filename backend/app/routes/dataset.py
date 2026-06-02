@@ -73,7 +73,7 @@ async def upload_dataset(file: UploadFile = File(...)):
             while chunk := await file.read(1024 * 1024):  # 1MB chunks
                 f.write(chunk)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error saving uploaded file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error saving uploaded file: {str(e)}") from e
 
     # Read dataset with fallback encodings to support non-UTF-8 datasets (e.g. latin1, cp1252)
     df = None
@@ -86,7 +86,7 @@ async def upload_dataset(file: UploadFile = File(...)):
         except UnicodeDecodeError as e:
             last_error = e
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}") from e
 
     if df is None:
         raise HTTPException(
@@ -148,7 +148,7 @@ async def analyze_columns():
     try:
         analysis = analyze_all_columns(df)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Column analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Column analysis failed: {str(e)}") from e
 
     _current_dataset["column_analysis"] = analysis
 
@@ -177,7 +177,7 @@ async def target_recommendations():
     try:
         recommendations = get_target_recommendations(df)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Recommendation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Recommendation failed: {str(e)}") from e
 
     return recommendations
 

@@ -59,7 +59,7 @@ async def predict(input_data: PredictionInput):
     try:
         processed = preprocess_for_prediction(input_data.features, feature_names, scaler)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Preprocessing error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Preprocessing error: {str(e)}") from e
 
     # Predict
     prediction = model.predict(processed)
@@ -126,7 +126,7 @@ async def predict_batch(file: UploadFile = File(...)):
     try:
         df = pd.read_csv(io.BytesIO(content))
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}") from e
 
     # Load pipeline
     pipeline = joblib.load(training_state["pipeline_path"])
