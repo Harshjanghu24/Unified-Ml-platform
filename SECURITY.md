@@ -4,4 +4,4 @@
 | ------- | ------------------ |
 | 1.0.x   | :white_check_mark: |
 ## Reporting a Vulnerability
-Please report security vulnerabilities to hillaniljppatel@gmail.com.
+Please report security vulnerabilities by opening a private security advisory on GitHub or contacting the maintainers directly.

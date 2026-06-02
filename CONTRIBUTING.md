@@ -1,6 +1,6 @@
 # Contributing to Unified ML Platform
+We love your input! We want to make contributing to this project as easy and transparent as possible. Lead maintainer: @Harshjanghu24.
 
-We love your input! We want to make contributing to this project as easy and transparent as possible.
 
 ## Technical Setup
 
