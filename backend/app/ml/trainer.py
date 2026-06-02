@@ -31,10 +31,6 @@ from ..logger import setup_logger
 logger = setup_logger(__name__)
 
 
-import warnings
-warnings.filterwarnings("ignore")
-
-
 # ── Hyperparameter grids ─────────────────────────────────────
 
 PARAM_GRIDS = {
@@ -111,7 +107,8 @@ def _evaluate_classifier(model, X_test, y_test, n_classes):
                 metrics["roc_auc"] = round(float(roc_auc_score(
                     y_test, y_proba, multi_class="ovr", average="weighted"
                 )), 4)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Failed to compute ROC-AUC: {str(e)}")
         metrics["roc_auc"] = None
 
     # Confusion Matrix
@@ -197,7 +194,9 @@ def _tune_and_train(model_class, model_name, X_train, y_train, problem_type):
             _test.fit([[0]], [0])
             extra_kwargs["device"] = "cuda"
             extra_kwargs["tree_method"] = "hist"
+            logger.info(f"GPU detected and will be used for {model_name}")
         except Exception:
+            logger.debug(f"GPU not detected for {model_name}, falling back to CPU.")
             pass
 
     if not param_grid:
@@ -309,5 +308,9 @@ def train_models(X_train, X_test, y_train, y_test, problem_type):
     for i, r in enumerate(results):
         r["is_best"] = (i == best_idx)
 
-    logger.info(f"Completed training for {len(results)} models. Best model: {results[best_idx]['model_name']}")
+    best_model = results[best_idx]
+    primary_metric = "f1_score" if problem_type != "regression" else "r2_score"
+    logger.info(f"Identified Best Model: {best_model['model_name']} with {primary_metric}: {best_model['metrics'][primary_metric]}")
+
+    logger.info(f"Completed training for {len(results)} models.")
     return results
