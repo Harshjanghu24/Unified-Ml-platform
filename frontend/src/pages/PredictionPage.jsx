@@ -7,6 +7,7 @@ import { predict, predictBatch, getMetrics } from '../services/api.js';
 export default function PredictionPage() {
   const [features, setFeatures] = useState({});
   const [featureNames, setFeatureNames] = useState([]);
+  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [explain, setExplain] = useState(false);
   const [batchFile, setBatchFile] = useState(null);
@@ -128,7 +129,7 @@ export default function PredictionPage() {
             {Object.keys(features).length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                 <p style={{ fontSize: '2rem', marginBottom: '8px' }}>📝</p>
-                <p>Click "Add Feature" to add feature fields for prediction.</p>
+                <p>Click &quot;Add Feature&quot; to add feature fields for prediction.</p>
                 <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>
                   Enter the same feature names used in your training dataset.
                 </p>
