@@ -91,7 +91,10 @@ async def upload_dataset(file: UploadFile = File(...)):
     if df is None:
         raise HTTPException(
             status_code=400,
-            detail=f"Unicode decode error. Failed to read CSV with common encodings. Detail: {str(last_error)}"
+            detail=(
+                "Unicode decode error. Failed to read CSV with common encodings. "
+                f"Detail: {str(last_error)}"
+            )
         )
 
     if df.empty:

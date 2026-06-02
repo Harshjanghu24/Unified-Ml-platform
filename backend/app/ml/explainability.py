@@ -45,9 +45,9 @@ def generate_shap_explanations(model, X_train, X_test, feature_names, problem_ty
         X_explain = X_test
 
     if len(X_train) > 200:
-        X_bg = X_train.iloc[:200] if isinstance(X_train, pd.DataFrame) else X_train[:200]
+        x_bg = X_train.iloc[:200] if isinstance(X_train, pd.DataFrame) else X_train[:200]
     else:
-        X_bg = X_train
+        x_bg = X_train
 
     try:
         # Choose appropriate explainer
@@ -57,13 +57,13 @@ def generate_shap_explanations(model, X_train, X_test, feature_names, problem_ty
             explainer = shap.TreeExplainer(model)
             shap_values = explainer.shap_values(X_explain)
         elif "Linear" in model_type or "Logistic" in model_type:
-            explainer = shap.LinearExplainer(model, X_bg)
+            explainer = shap.LinearExplainer(model, x_bg)
             shap_values = explainer.shap_values(X_explain)
         else:
             # KNN and other models - use KernelExplainer with small background
-            if len(X_bg) > 50:
-                X_bg = X_bg.iloc[:50] if isinstance(X_bg, pd.DataFrame) else X_bg[:50]
-            explainer = shap.KernelExplainer(model.predict, X_bg)
+            if len(x_bg) > 50:
+                x_bg = x_bg.iloc[:50] if isinstance(x_bg, pd.DataFrame) else x_bg[:50]
+            explainer = shap.KernelExplainer(model.predict, x_bg)
             shap_values = explainer.shap_values(X_explain, nsamples=50)
 
         # Handle multi-class SHAP values (list of arrays)
@@ -146,20 +146,20 @@ def explain_single_prediction(model, instance, X_train, feature_names, problem_t
     """
     try:
         if len(X_train) > 100:
-            X_bg = X_train.iloc[:100] if isinstance(X_train, pd.DataFrame) else X_train[:100]
+            x_bg = X_train.iloc[:100] if isinstance(X_train, pd.DataFrame) else X_train[:100]
         else:
-            X_bg = X_train
+            x_bg = X_train
 
         model_type = type(model).__name__
 
         if "Forest" in model_type or "Tree" in model_type:
             explainer = shap.TreeExplainer(model)
         elif "Linear" in model_type or "Logistic" in model_type:
-            explainer = shap.LinearExplainer(model, X_bg)
+            explainer = shap.LinearExplainer(model, x_bg)
         else:
-            if len(X_bg) > 50:
-                X_bg = X_bg.iloc[:50] if isinstance(X_bg, pd.DataFrame) else X_bg[:50]
-            explainer = shap.KernelExplainer(model.predict, X_bg)
+            if len(x_bg) > 50:
+                x_bg = x_bg.iloc[:50] if isinstance(x_bg, pd.DataFrame) else x_bg[:50]
+            explainer = shap.KernelExplainer(model.predict, x_bg)
 
         shap_values = explainer.shap_values(instance)
 
