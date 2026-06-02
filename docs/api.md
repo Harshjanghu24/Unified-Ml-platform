@@ -27,11 +27,52 @@ All API endpoints are prefixed with `/api`.
 | `GET`  | `/eda` | Retrieve generated Exploratory Data Analysis plots. |
 | `GET`  | `/system-info` | Get hardware status (CPU, RAM, GPU/CUDA). |
 
+**Example: Start Training**
+`POST /api/train`
+```json
+{
+  "target_column": "target",
+  "problem_type": "binary_classification",
+  "models": ["xgboost", "random_forest"],
+  "optimize": true
+}
+```
+*Response (202 Accepted):*
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "queued",
+  "message": "Training pipeline started successfully."
+}
+```
+
 ### Predictions
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/predict` | Perform a single prediction. Optionally includes SHAP explanations. |
 | `POST` | `/predict-batch` | Perform predictions on an uploaded CSV file. |
+
+**Example: Single Prediction**
+`POST /api/predict`
+```json
+{
+  "model_id": "model_20231027_1230",
+  "data": {
+    "age": 35,
+    "income": 75000,
+    "education": "Masters"
+  },
+  "explain": true
+}
+```
+*Response (200 OK):*
+```json
+{
+  "prediction": 1,
+  "probability": 0.85,
+  "explanation": "base64_encoded_shap_plot_string..."
+}
+```
 
 ### Model Management
 | Method | Endpoint | Description |

@@ -7,6 +7,37 @@ The Unified ML Platform is an AutoML-style application designed to simplify the 
 
 The platform follows a classic client-server architecture:
 
+```mermaid
+graph TD
+    User([User])
+    subgraph Frontend [React Frontend]
+        UI[UI Components]
+        Services[API Services]
+    end
+    subgraph Backend [FastAPI Backend]
+        Router[API Routers]
+        Lifecycle[App Lifecycle]
+    end
+    subgraph ML_Engine [ML Engine]
+        Detector[Target/Problem Detector]
+        Preprocessor[Data Preprocessor]
+        Trainer[Model Trainer]
+        Explainer[SHAP Explainer]
+    end
+    subgraph Storage [Filesystem & DB]
+        DB[(SQLite DB)]
+        Filesystem[(Dataset & Model Storage)]
+    end
+
+    User <--> UI
+    UI <--> Services
+    Services <--> Router
+    Router <--> ML_Engine
+    Router <--> DB
+    ML_Engine <--> Filesystem
+    Lifecycle --> DB
+```
+
 - **Frontend:** Built with **React 19** and **Vite**, providing a modern, responsive user interface. It communicates with the backend via a RESTful API.
 - **Backend:** A **FastAPI** application that serves as the orchestration layer for the ML Engine and handles request routing, data persistence, and asynchronous task management.
 - **ML Engine:** A specialized layer using **Scikit-Learn**, **XGBoost**, and **SHAP** for data processing, model training, and explainability.

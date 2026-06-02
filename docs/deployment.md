@@ -80,4 +80,28 @@ npm run build
 The resulting `dist/` folder can be served by any static file host or a web server like Nginx.
 
 ## Docker Deployment (Optional)
-While a Dockerfile is not provided in the root, you can containerize the application by creating standard Dockerfiles for the FastAPI backend and React frontend.
+While a Dockerfile is not provided in the root, you can containerize the application by creating standard Dockerfiles.
+
+**Example: Backend `Dockerfile`**
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies for ML libraries
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Create directory for data storage
+RUN mkdir -p data/uploads data/models data/reports
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
