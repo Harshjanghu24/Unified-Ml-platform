@@ -255,7 +255,6 @@ def _tune_and_train(model_class, model_name, X_train, y_train, problem_type):
         extra_kwargs = {
             "eval_metric": "logloss" if problem_type != "regression" else "rmse",
             "verbosity": 0,
-            "use_label_encoder": False,
         }
         # Try to use GPU if available (XGBoost native CUDA detection)
         try:

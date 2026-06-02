@@ -128,14 +128,15 @@ async def predict_batch(file: UploadFile = File(...)):
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported.")
 
-    # Read CSV
+    # Read CSV using robust loader
     content = await file.read()
-    import io
+    from ..ml.csv_loader import load_csv_from_bytes
 
-    try:
-        df = pd.read_csv(io.BytesIO(content))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}") from e
+    result = load_csv_from_bytes(content, filename=file.filename)
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error)
+    
+    df = result.df
 
     # Load pipeline
     pipeline = joblib.load(training_state["pipeline_path"])

@@ -38,9 +38,8 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
     dropped_cols = []
     for col in X.columns:
         n_unique = X[col].nunique()
-        # Stricter memory limit:
-        # drop categorical/text columns with > 20 unique values or high unique ratio.
-        if X[col].dtype == "object" or pd.api.types.is_categorical_dtype(X[col].dtype):
+        # Stricter memory limit: Drop categorical/text columns with > 20 unique values or high unique ratio
+        if X[col].dtype == "object" or isinstance(X[col].dtype, pd.CategoricalDtype):
             if n_unique > 20 or (n_unique / len(X) > 0.05 and len(X) > 50):
                 dropped_cols.append(col)
         # Drop numeric integer columns that are purely unique keys (like indices, row IDs)
@@ -113,9 +112,7 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
         label_encoder = LabelEncoder()
         y = pd.Series(label_encoder.fit_transform(y), index=y.index, name=target_column)
         steps_log.append(f"Label Encoded target column. Classes: {list(label_encoder.classes_)}")
-    elif problem_type is None and (
-        y.dtype == "object" or pd.api.types.is_categorical_dtype(y.dtype)
-    ):
+    elif problem_type is None and (y.dtype == "object" or isinstance(y.dtype, pd.CategoricalDtype)):
         label_encoder = LabelEncoder()
         y = pd.Series(label_encoder.fit_transform(y), index=y.index, name=target_column)
         steps_log.append(f"Label Encoded target column. Classes: {list(label_encoder.classes_)}")

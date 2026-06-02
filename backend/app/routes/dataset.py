@@ -15,8 +15,12 @@ import pandas as pd
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ..database import get_latest_dataset, save_dataset_record
+from ..logger import setup_logger
 from ..ml.analyzer import analyze_all_columns, get_target_recommendations
+from ..ml.csv_loader import CSVLoadResult, load_csv
 from ..ml.detector import detect_problem_type, get_target_info
+
+logger = setup_logger(__name__)
 
 router = APIRouter(prefix="/api", tags=["Dataset"])
 
@@ -25,6 +29,32 @@ _current_dataset = {}
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+def _raise_for_csv_result(result: CSVLoadResult):
+    """Convert a failed CSVLoadResult into an HTTPException with a user-friendly message."""
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.error or "Unknown CSV loading error.")
+
+
+def _build_summary(df: pd.DataFrame, target_info: dict = None) -> dict:
+    """Build a reusable dataset summary dict."""
+    missing_values = {k: int(v) for k, v in df.isnull().sum().to_dict().items()}
+    dtypes = {col: str(dtype) for col, dtype in df.dtypes.items()}
+
+    summary = {
+        "num_rows": len(df),
+        "num_cols": len(df.columns),
+        "columns": list(df.columns),
+        "dtypes": dtypes,
+        "missing_values": missing_values,
+        "total_missing": int(df.isnull().sum().sum()),
+        "numeric_columns": df.select_dtypes(include=["int64", "float64"]).columns.tolist(),
+        "categorical_columns": df.select_dtypes(include=["object", "category"]).columns.tolist(),
+    }
+    if target_info:
+        summary["target_info"] = target_info
+    return summary
 
 
 def get_current_dataset():
@@ -36,22 +66,18 @@ def get_current_dataset():
             filepath = os.path.join(UPLOAD_DIR, filename)
             if os.path.exists(filepath):
                 try:
-                    df = None
-                    for encoding in ["utf-8", "latin1", "cp1252", "utf-8-sig"]:
-                        try:
-                            df = pd.read_csv(filepath, encoding=encoding, low_memory=False)
-                            break
-                        except Exception:
-                            continue
-                    if df is not None:
-                        _current_dataset["df"] = df
+                    result = load_csv(filepath)
+                    if result.success:
+                        _current_dataset["df"] = result.df
                         _current_dataset["filename"] = filename
                         _current_dataset["filepath"] = filepath
                         _current_dataset["target_column"] = record.get("target_column")
                         _current_dataset["problem_type"] = record.get("problem_type")
                         _current_dataset["dataset_id"] = record.get("id")
+                    else:
+                        logger.warning(f"Auto-restore failed: {result.error}")
                 except Exception as e:
-                    print(f"[WARNING] Failed to auto-restore dataset from disk: {e}")
+                    logger.warning(f"Failed to auto-restore dataset from disk: {e}")
     return _current_dataset
 
 
@@ -61,7 +87,7 @@ async def upload_dataset(file: UploadFile = File(...)):
     Step 1: Upload a CSV dataset WITHOUT specifying a target column.
 
     - Saves the file to disk streaming in chunks to prevent high memory usage
-    - Reads it with Pandas trying multiple common encodings
+    - Reads it with the production CSV loader (auto-detects encoding & delimiter)
     - Computes basic summary statistics
     - Stores in memory for subsequent analysis
     """
@@ -77,45 +103,20 @@ async def upload_dataset(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error saving uploaded file: {str(e)}") from e
 
-    # Read dataset with fallback encodings to support non-UTF-8 datasets (e.g. latin1, cp1252)
-    df = None
-    encodings_to_try = ["utf-8", "latin1", "cp1252", "utf-8-sig"]
-    last_error = None
-    for encoding in encodings_to_try:
-        try:
-            df = pd.read_csv(filepath, encoding=encoding, low_memory=False)
-            break
-        except UnicodeDecodeError as e:
-            last_error = e
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error reading CSV: {str(e)}") from e
+    # ── Load with production CSV loader ──────────────────────
+    result = load_csv(filepath)
+    _raise_for_csv_result(result)
+    df = result.df
 
-    if df is None:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Unicode decode error. Failed to read CSV with common encodings. "
-                f"Detail: {str(last_error)}"
-            ),
-        )
+    logger.info(
+        f"Dataset uploaded: {file.filename} — "
+        f"{result.row_count:,} rows × {result.col_count} cols, "
+        f"{result.memory_usage_mb} MB, "
+        f"encoding={result.detected_encoding}, "
+        f"delimiter={repr(result.detected_delimiter)}"
+    )
 
-    if df.empty:
-        raise HTTPException(status_code=400, detail="The uploaded CSV file is empty.")
-
-    # Dataset summary
-    missing_values = {k: int(v) for k, v in df.isnull().sum().to_dict().items()}
-    dtypes = {col: str(dtype) for col, dtype in df.dtypes.items()}
-
-    summary = {
-        "num_rows": len(df),
-        "num_cols": len(df.columns),
-        "columns": list(df.columns),
-        "dtypes": dtypes,
-        "missing_values": missing_values,
-        "total_missing": int(df.isnull().sum().sum()),
-        "numeric_columns": df.select_dtypes(include=["int64", "float64"]).columns.tolist(),
-        "categorical_columns": df.select_dtypes(include=["object", "category"]).columns.tolist(),
-    }
+    summary = _build_summary(df)
 
     # Preview (first 10 rows) - cast to object first to prevent pandas fillna type conflicts
     preview = df.head(10).astype(object).fillna("").to_dict(orient="records")
@@ -128,12 +129,18 @@ async def upload_dataset(file: UploadFile = File(...)):
     _current_dataset["problem_type"] = None
     _current_dataset["dataset_id"] = None
 
-    return {
+    response = {
         "message": "Dataset uploaded successfully. Now analyze columns to find the best target.",
         "filename": file.filename,
         "summary": summary,
         "preview": preview,
     }
+
+    # Surface loader warnings to the frontend
+    if result.warnings:
+        response["warnings"] = result.warnings
+
+    return response
 
 
 @router.post("/analyze-columns")
@@ -211,21 +218,7 @@ async def select_target(target_column: str = Form(...)):
     problem_type = detect_problem_type(df, target_column)
     target_info = get_target_info(df, target_column)
 
-    # Dataset summary
-    missing_values = {k: int(v) for k, v in df.isnull().sum().to_dict().items()}
-    dtypes = {col: str(dtype) for col, dtype in df.dtypes.items()}
-
-    summary = {
-        "num_rows": len(df),
-        "num_cols": len(df.columns),
-        "columns": list(df.columns),
-        "dtypes": dtypes,
-        "missing_values": missing_values,
-        "total_missing": int(df.isnull().sum().sum()),
-        "target_info": target_info,
-        "numeric_columns": df.select_dtypes(include=["int64", "float64"]).columns.tolist(),
-        "categorical_columns": df.select_dtypes(include=["object", "category"]).columns.tolist(),
-    }
+    summary = _build_summary(df, target_info=target_info)
 
     # Save to database
     dataset_id = save_dataset_record(
@@ -272,25 +265,12 @@ async def get_dataset_summary():
     target_column = _current_dataset.get("target_column")
     problem_type = _current_dataset.get("problem_type")
 
-    missing_values = {k: int(v) for k, v in df.isnull().sum().to_dict().items()}
-    dtypes = {col: str(dtype) for col, dtype in df.dtypes.items()}
-
-    summary = {
-        "num_rows": len(df),
-        "num_cols": len(df.columns),
-        "columns": list(df.columns),
-        "dtypes": dtypes,
-        "missing_values": missing_values,
-        "total_missing": int(df.isnull().sum().sum()),
-        "numeric_columns": df.select_dtypes(include=["int64", "float64"]).columns.tolist(),
-        "categorical_columns": df.select_dtypes(include=["object", "category"]).columns.tolist(),
-    }
-
+    target_info = None
     if target_column:
         target_info = get_target_info(df, target_column)
-        summary["target_info"] = target_info
+    summary = _build_summary(df, target_info=target_info)
 
-    preview = df.head(10).fillna("").to_dict(orient="records")
+    preview = df.head(10).astype(object).fillna("").to_dict(orient="records")
 
     return {
         "summary": summary,

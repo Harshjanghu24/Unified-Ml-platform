@@ -1,17 +1,39 @@
-fastapi
-uvicorn
-scikit-learn
-pandas
-numpy
-joblib
-matplotlib
-seaborn
-python-multipart
-pydantic
-shap
-fpdf2
-scipy
-xgboost
-psutil
+# ══════════════════════════════════════════════════════════════
+# Unified Supervised Learning AutoML Platform — Python 3.12.4
+# Pinned versions verified for CPython 3.12 compatibility
+# ══════════════════════════════════════════════════════════════
+
+# ── Web Framework ─────────────────────────────────────────────
+fastapi==0.136.3
+uvicorn==0.48.0
+python-multipart==0.0.30
+pydantic==2.13.4
 pydantic-settings
+starlette==1.2.1
+
+# ── Data Processing ──────────────────────────────────────────
+pandas==3.0.3
+numpy==2.4.6
+scipy==1.17.1
+openpyxl==3.1.5
+
+# ── Machine Learning ─────────────────────────────────────────
+scikit-learn==1.8.0
+xgboost==3.2.0
+joblib==1.5.3
+
+# ── Model Explainability ─────────────────────────────────────
+shap==0.52.0
+
+# ── Visualization ────────────────────────────────────────────
+matplotlib==3.10.9
+seaborn==0.13.2
+
+# ── Reporting ────────────────────────────────────────────────
+fpdf2==2.8.7
+
+# ── System Monitoring ────────────────────────────────────────
+psutil==7.2.2
+
+# ── Experiment Tracking (added by collaborator) ──────────────
 mlflow

@@ -27,7 +27,7 @@ def detect_problem_type(df: pd.DataFrame, target_column: str) -> str:
     dtype = target.dtype
 
     # Categorical / object columns
-    if dtype == "object" or pd.api.types.is_categorical_dtype(dtype):
+    if dtype == "object" or isinstance(dtype, pd.CategoricalDtype):
         if n_unique == 2:
             return "binary"
         return "multiclass"
