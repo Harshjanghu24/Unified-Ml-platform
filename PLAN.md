@@ -34,8 +34,7 @@ Building ML models typically requires manual exploration, expert knowledge for p
 | 11 | Downloadable PDF report generation | ✅ |
 | 12 | GPU (CUDA) acceleration for XGBoost | ✅ |
 | 13 | Asynchronous background training with progress tracking | ✅ |
-| 14 | Memory-safe preprocessing with cardinality guards | ✅ |
-| 15 | Modern, responsive React frontend | ✅ |
+| 14 | Modern, responsive React frontend | ✅ |
 
 ---
 
@@ -95,7 +94,7 @@ Phase 3: Training Engine   → Model training, tuning, cross-validation
 Phase 4: Evaluation        → Metrics, plots, confusion matrices, ROC curves
 Phase 5: Intelligence      → Feature selection, SHAP explainability
 Phase 6: User Experience   → Prediction UI, EDA page, report generation
-Phase 7: Optimization      → Async training, GPU support, memory guards
+Phase 7: Optimization      → Async training, GPU support
 Phase 8: Stabilization     → Bug fixes, label encoding, edge cases
 Phase 9: Documentation     → README, PLAN.md, ARCHITECTURE.md
 ```
@@ -139,7 +138,7 @@ Phase 9: Documentation     → README, PLAN.md, ARCHITECTURE.md
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Large datasets cause memory overflow | High | Cardinality limits, feature cap at 500, chunked upload |
+| Large datasets cause memory overflow | High | Chunked upload |
 | Long training blocks server | High | Async background tasks with progress polling |
 | Non-numeric target labels crash metrics | High | Automated LabelEncoder before training |
 | XGBoost not installed | Medium | Graceful fallback — excluded if unavailable |
