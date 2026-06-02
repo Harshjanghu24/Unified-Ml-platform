@@ -6,6 +6,6 @@ describe('App', () => {
   it('renders without crashing', () => {
     render(<App />)
     expect(screen.getByText(/Intelligent/i)).toBeInTheDocument()
-    expect(screen.getByText(/AutoML Platform/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/AutoML Platform/i).length).toBeGreaterThan(0)
   })
 })

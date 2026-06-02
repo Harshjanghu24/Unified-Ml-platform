@@ -11,7 +11,7 @@ if 'mlflow' not in sys.modules:
     sys.modules['mlflow'] = mock_mlflow
     sys.modules['mlflow.sklearn'] = mock_mlflow_sklearn
 
-from app.ml.trainer import train_models
+from app.ml.trainer import train_models, HAS_XGBOOST
 
 def test_train_models_returns_reproducibility_metadata():
     # Setup simple binary classification data
@@ -31,6 +31,8 @@ def test_train_models_returns_reproducibility_metadata():
         assert "sklearn_version" in metadata
         assert "pandas_version" in metadata
         assert "numpy_version" in metadata
+        if HAS_XGBOOST:
+            assert "xgboost_version" in metadata
 
 @patch("app.ml.trainer.HAS_MLFLOW", True)
 def test_train_models_mlflow_integration():
@@ -42,8 +44,8 @@ def test_train_models_mlflow_integration():
     problem_type = "binary"
 
     with patch("app.ml.trainer.mlflow") as mock_mlflow_mod:
-        # Configure mocks
-        mock_mlflow_mod.active_run.return_value = None
+        # Configure mocks for context manager
+        mock_mlflow_mod.start_run.return_value.__enter__.return_value = MagicMock()
         
         train_models(X_train, X_test, y_train, y_test, problem_type)
 
@@ -52,6 +54,7 @@ def test_train_models_mlflow_integration():
         assert mock_mlflow_mod.log_params.called
         assert mock_mlflow_mod.log_metrics.called
         assert mock_mlflow_mod.sklearn.log_model.called
+        assert mock_mlflow_mod.set_tag.called
 
 @patch("app.ml.trainer.HAS_MLFLOW", False)
 def test_train_models_no_mlflow_graceful():

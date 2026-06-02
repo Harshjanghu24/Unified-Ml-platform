@@ -51,6 +51,12 @@ def _get_reproducibility_metadata():
         "numpy_version": np.__version__,
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
     }
+    if HAS_XGBOOST:
+        try:
+            import xgboost
+            metadata["xgboost_version"] = xgboost.__version__
+        except Exception:
+            pass
     return metadata
 
 
@@ -60,24 +66,24 @@ def _log_to_mlflow(model_name, model, params, metrics, problem_type):
         return
 
     try:
-        # Start a new MLflow run if one isn't already active
-        if not mlflow.active_run():
-            mlflow.start_run(run_name=f"{model_name}_{int(time.time())}")
+        run_name = f"{model_name}_{int(time.time())}"
+        # Use context manager for cleaner run management
+        with mlflow.start_run(run_name=run_name, nested=True):
+            # Log parameters
+            if params:
+                mlflow.log_params(params)
 
-        # Log parameters
-        if params:
-            mlflow.log_params(params)
+            # Log metrics
+            # Filter out non-numeric metrics like confusion_matrix or classification_report
+            numeric_metrics = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
+            mlflow.log_metrics(numeric_metrics)
 
-        # Log metrics
-        # Filter out non-numeric metrics like confusion_matrix or classification_report
-        numeric_metrics = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
-        mlflow.log_metrics(numeric_metrics)
-
-        # Log model
-        mlflow.sklearn.log_model(model, "model")
-
-        # End the run if we started it here
-        mlflow.end_run()
+            # Log model
+            mlflow.sklearn.log_model(model, "model")
+            
+            # Log problem type as tag
+            mlflow.set_tag("problem_type", problem_type)
+            
     except Exception as e:
         logger.warning(f"Failed to log to MLflow for {model_name}: {str(e)}")
 
