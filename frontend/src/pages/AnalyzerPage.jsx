@@ -1,18 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import {
-  HiSearchCircle, HiCheckCircle, HiArrowRight, HiExclamationCircle,
-  HiStar, HiTrendingUp, HiViewGrid
+  HiSearchCircle, HiCheckCircle, HiArrowRight,
+  HiStar
 } from 'react-icons/hi';
 import {
   analyzeColumns, getTargetRecommendations, selectTarget
 } from '../services/api.js';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell, RadarChart, PolarGrid,
-  PolarAngleAxis, PolarRadiusAxis, Radar, Legend
+  ResponsiveContainer, Legend
 } from 'recharts';
 
 const TYPE_COLORS = {

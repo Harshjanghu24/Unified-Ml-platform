@@ -7,8 +7,6 @@ import { predict, predictBatch, getMetrics } from '../services/api.js';
 export default function PredictionPage() {
   const [features, setFeatures] = useState({});
   const [featureNames, setFeatureNames] = useState([]);
-  const [problemType, setProblemType] = useState('');
-  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [explain, setExplain] = useState(false);
   const [batchFile, setBatchFile] = useState(null);
@@ -18,10 +16,7 @@ export default function PredictionPage() {
 
   useEffect(() => {
     // Get feature names from metrics
-    getMetrics().then(({ data }) => {
-      if (data.models?.[0]?.metrics) {
-        setProblemType(data.problem_type || '');
-      }
+    getMetrics().then(() => {
     }).catch(() => {});
   }, []);
 

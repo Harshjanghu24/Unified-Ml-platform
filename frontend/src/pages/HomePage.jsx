@@ -88,7 +88,7 @@ export default function HomePage() {
           AI-Powered Target Recommendation
         </h3>
         <p style={{ color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto', lineHeight: 1.6 }}>
-          Unlike traditional AutoML tools, you <strong>don't need to specify the target column</strong>. 
+          Unlike traditional AutoML tools, you <strong>don&apos;t need to specify the target column</strong>. 
           Our system analyzes entropy, variance, cardinality, and distribution metrics for every column, 
           then ranks them with confidence scores so you can make an informed selection.
         </p>

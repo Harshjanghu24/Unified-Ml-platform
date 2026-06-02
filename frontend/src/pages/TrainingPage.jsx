@@ -56,7 +56,7 @@ export default function TrainingPage() {
           } else {
             setProgressText(statusRes.data.progress || 'Running...');
           }
-        } catch (err) {
+        } catch {
             clearInterval(pollInterval);
             clearInterval(timer);
             toast.error('Failed to get training status.');

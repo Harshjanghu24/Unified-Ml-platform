@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import { HiUpload, HiDatabase, HiCheckCircle, HiArrowRight } from 'react-icons/hi';
+import { HiUpload, HiDatabase, HiArrowRight } from 'react-icons/hi';
 import { uploadDataset } from '../services/api.js';
 
 export default function DatasetPage() {

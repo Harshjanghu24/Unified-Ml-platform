@@ -5,8 +5,7 @@ import { HiDocumentReport } from 'react-icons/hi';
 import { getMetrics, generateReport } from '../services/api.js';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis,
-  PolarRadiusAxis, Radar
+  ResponsiveContainer
 } from 'recharts';
 
 export default function EvaluationPage() {
@@ -69,7 +68,7 @@ export default function EvaluationPage() {
     );
   }
 
-  const { models, eval_plots, shap_results, problem_type, best_model } = data;
+  const { models, eval_plots, shap_results } = data;
 
   // Prepare chart data
   const chartData = models?.map((m) => ({
