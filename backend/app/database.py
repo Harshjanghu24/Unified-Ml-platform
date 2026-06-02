@@ -4,10 +4,11 @@ Handles connection management and schema initialization for
 datasets and trained_models tables.
 """
 
-import sqlite3
-import os
 import json
+import os
+import sqlite3
 from datetime import datetime
+
 from .config import get_settings
 
 
@@ -16,7 +17,7 @@ def get_db_path():
     path = settings.db_path
     if settings.testing:
         path = "data/test_platform.db"
-    
+
     base_dir = os.path.dirname(os.path.dirname(__file__))
     if os.path.isabs(path):
         return path
@@ -24,7 +25,6 @@ def get_db_path():
 
 
 def get_connection():
-
     """Get a SQLite connection with row_factory enabled."""
     db_path = get_db_path()
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -74,15 +74,27 @@ def init_db():
 
 # ── CRUD helpers ──────────────────────────────────────────────
 
+
 def save_dataset_record(filename, target_column, problem_type, num_rows, num_cols, summary):
     """Insert a dataset record and return its id."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        """INSERT INTO datasets (filename, target_column, problem_type, num_rows, num_cols, upload_time, summary)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (filename, target_column, problem_type, num_rows, num_cols,
-         datetime.now().isoformat(), json.dumps(summary))
+        """
+        INSERT INTO datasets (
+            filename, target_column, problem_type, num_rows, num_cols, upload_time, summary
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            filename,
+            target_column,
+            problem_type,
+            num_rows,
+            num_cols,
+            datetime.now().isoformat(),
+            json.dumps(summary),
+        ),
     )
     conn.commit()
     dataset_id = cursor.lastrowid
@@ -90,8 +102,17 @@ def save_dataset_record(filename, target_column, problem_type, num_rows, num_col
     return dataset_id
 
 
-def save_model_record(dataset_id, model_name, problem_type, metrics, training_time,
-                      model_path, is_best=False, best_params=None, cv_scores=None):
+def save_model_record(
+    dataset_id,
+    model_name,
+    problem_type,
+    metrics,
+    training_time,
+    model_path,
+    is_best=False,
+    best_params=None,
+    cv_scores=None,
+):
     """Insert a trained model record and return its id."""
     conn = get_connection()
     cursor = conn.cursor()
@@ -100,9 +121,18 @@ def save_model_record(dataset_id, model_name, problem_type, metrics, training_ti
            (dataset_id, model_name, problem_type, metrics, training_time,
             model_path, is_best, best_params, cv_scores, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (dataset_id, model_name, problem_type, json.dumps(metrics), training_time,
-         model_path, int(is_best), json.dumps(best_params) if best_params else None,
-         json.dumps(cv_scores) if cv_scores else None, datetime.now().isoformat())
+        (
+            dataset_id,
+            model_name,
+            problem_type,
+            json.dumps(metrics),
+            training_time,
+            model_path,
+            int(is_best),
+            json.dumps(best_params) if best_params else None,
+            json.dumps(cv_scores) if cv_scores else None,
+            datetime.now().isoformat(),
+        ),
     )
     conn.commit()
     model_id = cursor.lastrowid
@@ -159,8 +189,7 @@ def get_models_by_dataset(dataset_id):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT * FROM trained_models WHERE dataset_id = ? ORDER BY created_at DESC",
-        (dataset_id,)
+        "SELECT * FROM trained_models WHERE dataset_id = ? ORDER BY created_at DESC", (dataset_id,)
     )
     rows = [dict(r) for r in cursor.fetchall()]
     conn.close()

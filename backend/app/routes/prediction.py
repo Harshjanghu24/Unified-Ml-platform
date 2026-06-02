@@ -4,22 +4,24 @@ Handles single predictions (from form data) and batch predictions (from CSV uplo
 """
 
 import os
-import pandas as pd
-import numpy as np
+from typing import Any, Dict, Optional
+
 import joblib
-from fastapi import APIRouter, HTTPException, UploadFile, File
+import pandas as pd
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
-from ..routes.dataset import get_current_dataset
-from ..routes.training import get_training_state, MODELS_DIR
-from ..ml.preprocessor import preprocess_for_prediction
+
 from ..ml.explainability import explain_single_prediction
+from ..ml.preprocessor import preprocess_for_prediction
+from ..routes.dataset import get_current_dataset
+from ..routes.training import MODELS_DIR, get_training_state
 
 router = APIRouter(prefix="/api", tags=["Prediction"])
 
 
 class PredictionInput(BaseModel):
     """Schema for single prediction input."""
+
     features: Dict[str, Any]
     explain: Optional[bool] = False
 
@@ -36,7 +38,9 @@ async def predict(input_data: PredictionInput):
     dataset = get_current_dataset()
 
     if not training_state.get("pipeline_path"):
-        raise HTTPException(status_code=400, detail="No trained model available. Run training first.")
+        raise HTTPException(
+            status_code=400, detail="No trained model available. Run training first."
+        )
 
     # Load pipeline
     pipeline = joblib.load(training_state["pipeline_path"])
@@ -82,8 +86,9 @@ async def predict(input_data: PredictionInput):
             proba = model.predict_proba(processed)[0]
             result["confidence"] = round(float(max(proba)), 4)
             result["class_probabilities"] = {
-                str(label_encoder.inverse_transform([i])[0] if label_encoder else str(i)):
-                round(float(p), 4)
+                str(label_encoder.inverse_transform([i])[0] if label_encoder else str(i)): round(
+                    float(p), 4
+                )
                 for i, p in enumerate(proba)
             }
     else:
@@ -95,7 +100,10 @@ async def predict(input_data: PredictionInput):
             X_train = dataset.get("df")
             if X_train is not None:
                 from ..ml.preprocessor import build_preprocessing_pipeline
-                prep = build_preprocessing_pipeline(X_train, pipeline["target_column"], problem_type)
+
+                prep = build_preprocessing_pipeline(
+                    X_train, pipeline["target_column"], problem_type
+                )
                 explanation = explain_single_prediction(
                     model, processed, prep["X_train"], feature_names, problem_type
                 )
@@ -123,6 +131,7 @@ async def predict_batch(file: UploadFile = File(...)):
     # Read CSV
     content = await file.read()
     import io
+
     try:
         df = pd.read_csv(io.BytesIO(content))
     except Exception as e:

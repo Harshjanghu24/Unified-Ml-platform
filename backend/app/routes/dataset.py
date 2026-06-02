@@ -10,11 +10,13 @@
 # """
 
 import os
+
 import pandas as pd
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from ..database import save_dataset_record, get_latest_dataset
-from ..ml.detector import detect_problem_type, get_target_info
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
+from ..database import get_latest_dataset, save_dataset_record
 from ..ml.analyzer import analyze_all_columns, get_target_recommendations
+from ..ml.detector import detect_problem_type, get_target_info
 
 router = APIRouter(prefix="/api", tags=["Dataset"])
 
@@ -94,7 +96,7 @@ async def upload_dataset(file: UploadFile = File(...)):
             detail=(
                 "Unicode decode error. Failed to read CSV with common encodings. "
                 f"Detail: {str(last_error)}"
-            )
+            ),
         )
 
     if df.empty:
@@ -202,7 +204,7 @@ async def select_target(target_column: str = Form(...)):
     if target_column not in df.columns:
         raise HTTPException(
             status_code=400,
-            detail=f"Column '{target_column}' not found. Available: {list(df.columns)}"
+            detail=f"Column '{target_column}' not found. Available: {list(df.columns)}",
         )
 
     # Detect problem type
@@ -241,7 +243,9 @@ async def select_target(target_column: str = Form(...)):
     _current_dataset["dataset_id"] = dataset_id
 
     return {
-        "message": f"Target column '{target_column}' selected. Problem type: {problem_type.upper()}",
+        "message": (
+            f"Target column '{target_column}' selected. " f"Problem type: {problem_type.upper()}"
+        ),
         "dataset_id": dataset_id,
         "target_column": target_column,
         "problem_type": problem_type,

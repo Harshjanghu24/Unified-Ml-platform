@@ -5,22 +5,25 @@ hyperparameter tuning, and cross-validation orchestration.
 """
 
 import os
-import joblib
 import uuid
+
+import joblib
 import psutil
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from ..routes.dataset import get_current_dataset
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+
+from ..database import save_model_record
+from ..ml.eda import (
+    generate_actual_vs_predicted,
+    generate_all_eda,
+    generate_confusion_matrix_plot,
+    generate_residual_plot,
+    generate_roc_curve,
+)
+from ..ml.explainability import generate_shap_explanations
+from ..ml.feature_selection import run_feature_selection
 from ..ml.preprocessor import build_preprocessing_pipeline
 from ..ml.trainer import train_models
-from ..ml.feature_selection import run_feature_selection
-from ..ml.explainability import generate_shap_explanations
-from ..ml.eda import (
-    generate_confusion_matrix_plot, generate_roc_curve,
-    generate_actual_vs_predicted, generate_residual_plot,
-    generate_all_eda
-)
-from ..database import save_model_record
-
+from ..routes.dataset import get_current_dataset
 
 router = APIRouter(prefix="/api", tags=["Training"])
 
@@ -28,9 +31,11 @@ router = APIRouter(prefix="/api", tags=["Training"])
 _training_state = {}
 _jobs = {}
 
+
 def get_training_state():
     """Access training state from other modules."""
     return _training_state
+
 
 MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "models")
 os.makedirs(MODELS_DIR, exist_ok=True)
@@ -112,8 +117,9 @@ def _run_training_pipeline_task(job_id: str, dataset: dict):
             model_path = os.path.join(MODELS_DIR, model_filename)
             joblib.dump(result["model_object"], model_path)
 
-            clean_metrics = {k: v for k, v in result["metrics"].items()
-                            if k not in ("y_pred", "y_test")}
+            clean_metrics = {
+                k: v for k, v in result["metrics"].items() if k not in ("y_pred", "y_test")
+            }
 
             model_id = save_model_record(
                 dataset_id=dataset_id,
@@ -127,25 +133,30 @@ def _run_training_pipeline_task(job_id: str, dataset: dict):
                 cv_scores=result.get("cv_scores"),
             )
 
-            saved_models.append({
-                "model_id": model_id,
-                "model_name": result["model_name"],
-                "is_best": result["is_best"],
-                "metrics": clean_metrics,
-                "training_time": result["training_time"],
-                "best_params": result.get("best_params", {}),
-                "best_search_score": result.get("best_search_score"),
-                "cv_scores": result.get("cv_scores", {}),
-            })
+            saved_models.append(
+                {
+                    "model_id": model_id,
+                    "model_name": result["model_name"],
+                    "is_best": result["is_best"],
+                    "metrics": clean_metrics,
+                    "training_time": result["training_time"],
+                    "best_params": result.get("best_params", {}),
+                    "best_search_score": result.get("best_search_score"),
+                    "cv_scores": result.get("cv_scores", {}),
+                }
+            )
 
         pipeline_path = os.path.join(MODELS_DIR, f"pipeline_{dataset_id}.joblib")
-        joblib.dump({
-            "scaler": scaler,
-            "label_encoder": label_encoder,
-            "feature_names": feature_names,
-            "problem_type": problem_type,
-            "target_column": target_column,
-        }, pipeline_path)
+        joblib.dump(
+            {
+                "scaler": scaler,
+                "label_encoder": label_encoder,
+                "feature_names": feature_names,
+                "problem_type": problem_type,
+                "target_column": target_column,
+            },
+            pipeline_path,
+        )
 
         _training_state["models"] = saved_models
         _training_state["preprocessing_steps"] = steps_log
@@ -177,14 +188,16 @@ def _run_training_pipeline_task(job_id: str, dataset: dict):
 async def train(background_tasks: BackgroundTasks):
     dataset = get_current_dataset()
     if dataset.get("df") is None:
-        raise HTTPException(status_code=400, detail="No dataset uploaded. Please upload a dataset first.")
+        raise HTTPException(
+            status_code=400, detail="No dataset uploaded. Please upload a dataset first."
+        )
 
     job_id = str(uuid.uuid4())
     _jobs[job_id] = {
         "status": "running",
         "progress": "Initializing training pipeline...",
         "result": None,
-        "error": None
+        "error": None,
     }
     background_tasks.add_task(_run_training_pipeline_task, job_id, dataset)
     return {"job_id": job_id, "message": "Training started in the background."}
@@ -194,28 +207,25 @@ async def train(background_tasks: BackgroundTasks):
 async def get_train_status(job_id: str):
     if job_id not in _jobs:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     job = _jobs[job_id]
     if job["status"] == "failed":
         return {"status": "failed", "error": job["error"]}
-        
-    return {
-        "status": job["status"],
-        "progress": job["progress"]
-    }
+
+    return {"status": job["status"], "progress": job["progress"]}
 
 
 @router.get("/train-result/{job_id}")
 async def get_train_result(job_id: str):
     if job_id not in _jobs:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     job = _jobs[job_id]
     if job["status"] == "running":
         raise HTTPException(status_code=400, detail="Job is still running")
     elif job["status"] == "failed":
         raise HTTPException(status_code=500, detail=f"Job failed: {job['error']}")
-        
+
     return job["result"]
 
 
@@ -230,7 +240,8 @@ async def get_metrics():
         "feature_selection": _training_state.get("feature_selection", {}),
         "eval_plots": _training_state.get("eval_plots", {}),
         "shap_results": {
-            k: v for k, v in _training_state.get("shap_results", {}).items()
+            k: v
+            for k, v in _training_state.get("shap_results", {}).items()
             if k != "error" or v is not None
         },
         "problem_type": _training_state.get("problem_type"),
@@ -250,8 +261,7 @@ async def get_eda():
                 return {"plots": eda_plots}
             except Exception as e:
                 raise HTTPException(
-                    status_code=500,
-                    detail=f"EDA generation failed: {str(e)}"
+                    status_code=500, detail=f"EDA generation failed: {str(e)}"
                 ) from e
         raise HTTPException(status_code=404, detail="No dataset or training data available.")
 
@@ -263,18 +273,29 @@ async def get_system_info():
     """Return CPU, RAM, GPU, and CUDA status."""
     info = {
         "cpu": f"{psutil.cpu_percent()}% usage ({psutil.cpu_count(logical=True)} cores)",
-        "ram": f"{round(psutil.virtual_memory().used / (1024**3), 2)}GB / {round(psutil.virtual_memory().total / (1024**3), 2)}GB ({psutil.virtual_memory().percent}%)",
+        "ram": (
+            f"{round(psutil.virtual_memory().used / (1024**3), 2)}GB / "
+            f"{round(psutil.virtual_memory().total / (1024**3), 2)}GB "
+            f"({psutil.virtual_memory().percent}%)"
+        ),
         "gpu": "Unavailable",
         "cuda_status": False,
-        "vram": "N/A"
+        "vram": "N/A",
     }
 
     # Detect GPU via nvidia-smi (no torch dependency required)
     try:
         import subprocess
+
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,memory.total,memory.used", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5
+            [
+                "nvidia-smi",
+                "--query-gpu=name,memory.total,memory.used",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
             parts = result.stdout.strip().split(", ")
@@ -285,5 +306,5 @@ async def get_system_info():
             info["vram"] = f"{round(used_vram, 2)}GB / {round(total_vram, 2)}GB"
     except Exception:
         pass
-        
+
     return info

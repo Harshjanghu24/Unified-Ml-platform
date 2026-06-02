@@ -5,11 +5,13 @@ Also provides the report generation endpoint.
 """
 
 import os
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
-from ..database import get_all_models, delete_model_record, get_latest_dataset
-from ..routes.training import get_training_state
+
+from ..database import delete_model_record, get_all_models, get_latest_dataset
 from ..ml.report_generator import generate_report
+from ..routes.training import get_training_state
 
 router = APIRouter(prefix="/api", tags=["Models"])
 

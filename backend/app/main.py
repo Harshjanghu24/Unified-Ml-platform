@@ -7,13 +7,14 @@ This is the main application module that:
   - Includes all API routers
 """
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from .database import init_db
-from .routes import dataset, training, prediction, models
 from .logger import setup_logger
+from .routes import dataset, models, prediction, training
 
 logger = setup_logger(__name__)
 

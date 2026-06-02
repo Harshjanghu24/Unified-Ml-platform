@@ -7,25 +7,34 @@ and K-Fold Cross Validation.
 Supports XGBoost along with scikit-learn models.
 """
 
-import time
-import sys
 import platform
+import sys
+import time
+
 import numpy as np
 import pandas as pd
 import sklearn
-from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_score
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    roc_auc_score, confusion_matrix, classification_report,
-    mean_absolute_error, mean_squared_error, r2_score
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    mean_absolute_error,
+    mean_squared_error,
+    precision_score,
+    r2_score,
+    recall_score,
+    roc_auc_score,
 )
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_score
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
 
 try:
     from xgboost import XGBClassifier, XGBRegressor
+
     HAS_XGBOOST = True
 except ImportError:
     HAS_XGBOOST = False
@@ -33,12 +42,14 @@ except ImportError:
 try:
     import mlflow
     import mlflow.sklearn
+
     HAS_MLFLOW = True
 except ImportError:
     HAS_MLFLOW = False
     mlflow = None
 
 from ..logger import setup_logger
+
 logger = setup_logger(__name__)
 
 
@@ -50,11 +61,12 @@ def _get_reproducibility_metadata():
         "sklearn_version": sklearn.__version__,
         "pandas_version": pd.__version__,
         "numpy_version": np.__version__,
-        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     if HAS_XGBOOST:
         try:
             import xgboost
+
             metadata["xgboost_version"] = xgboost.__version__
         except Exception:
             pass
@@ -81,10 +93,10 @@ def _log_to_mlflow(model_name, model, params, metrics, problem_type):
 
             # Log model
             mlflow.sklearn.log_model(model, "model")
-            
+
             # Log problem type as tag
             mlflow.set_tag("problem_type", problem_type)
-            
+
     except Exception as e:
         logger.warning(f"Failed to log to MLflow for {model_name}: {str(e)}")
 
@@ -162,9 +174,9 @@ def _evaluate_classifier(model, X_test, y_test, n_classes):
         else:
             if hasattr(model, "predict_proba"):
                 y_proba = model.predict_proba(X_test)
-                metrics["roc_auc"] = round(float(roc_auc_score(
-                    y_test, y_proba, multi_class="ovr", average="weighted"
-                )), 4)
+                metrics["roc_auc"] = round(
+                    float(roc_auc_score(y_test, y_proba, multi_class="ovr", average="weighted")), 4
+                )
     except Exception as e:
         logger.warning(f"Failed to compute ROC-AUC: {str(e)}")
         metrics["roc_auc"] = None
@@ -242,12 +254,13 @@ def _tune_and_train(model_class, model_name, X_train, y_train, problem_type):
     if "XGB" in model_name:
         extra_kwargs = {
             "eval_metric": "logloss" if problem_type != "regression" else "rmse",
-            "verbosity": 0, 
-            "use_label_encoder": False
+            "verbosity": 0,
+            "use_label_encoder": False,
         }
         # Try to use GPU if available (XGBoost native CUDA detection)
         try:
             import xgboost as _xgb
+
             _test = _xgb.XGBClassifier(device="cuda", n_estimators=1)
             _test.fit([[0]], [0])
             extra_kwargs["device"] = "cuda"
@@ -273,20 +286,29 @@ def _tune_and_train(model_class, model_name, X_train, y_train, problem_type):
     base_model = model_class(**extra_kwargs) if extra_kwargs else model_class()
 
     if grid_size <= 50:
-        search = GridSearchCV(
-            base_model, param_grid, cv=3, scoring=scoring, n_jobs=-1, refit=True
-        )
+        search = GridSearchCV(base_model, param_grid, cv=3, scoring=scoring, n_jobs=-1, refit=True)
     else:
         search = RandomizedSearchCV(
-            base_model, param_grid, n_iter=20, cv=3, scoring=scoring,
-            n_jobs=-1, refit=True, random_state=42
+            base_model,
+            param_grid,
+            n_iter=20,
+            cv=3,
+            scoring=scoring,
+            n_jobs=-1,
+            refit=True,
+            random_state=42,
         )
 
     search.fit(X_train, y_train)
 
-    best_params = {k: (int(v) if isinstance(v, (np.integer,)) else
-                       float(v) if isinstance(v, (np.floating,)) else v)
-                   for k, v in search.best_params_.items()}
+    best_params = {
+        k: (
+            int(v)
+            if isinstance(v, (np.integer,))
+            else float(v) if isinstance(v, (np.floating,)) else v
+        )
+        for k, v in search.best_params_.items()
+    }
 
     return search.best_estimator_, best_params, round(float(search.best_score_), 4)
 
@@ -351,16 +373,18 @@ def train_models(X_train, X_test, y_train, y_test, problem_type):
         # MLflow Logging
         _log_to_mlflow(model_name, model, best_params, metrics, problem_type)
 
-        results.append({
-            "model_name": model_name,
-            "model_object": model,
-            "metrics": metrics,
-            "training_time": training_time,
-            "best_params": best_params,
-            "best_search_score": best_search_score,
-            "cv_scores": cv_scores,
-            "reproducibility_metadata": repro_metadata,
-        })
+        results.append(
+            {
+                "model_name": model_name,
+                "model_object": model,
+                "metrics": metrics,
+                "training_time": training_time,
+                "best_params": best_params,
+                "best_search_score": best_search_score,
+                "cv_scores": cv_scores,
+                "reproducibility_metadata": repro_metadata,
+            }
+        )
 
     # Determine best model
     if problem_type in ("binary", "multiclass"):
@@ -369,11 +393,14 @@ def train_models(X_train, X_test, y_train, y_test, problem_type):
         best_idx = max(range(len(results)), key=lambda i: results[i]["metrics"]["r2_score"])
 
     for i, r in enumerate(results):
-        r["is_best"] = (i == best_idx)
+        r["is_best"] = i == best_idx
 
     best_model = results[best_idx]
     primary_metric = "f1_score" if problem_type != "regression" else "r2_score"
-    logger.info(f"Identified Best Model: {best_model['model_name']} with {primary_metric}: {best_model['metrics'][primary_metric]}")
+    logger.info(
+        f"Identified Best Model: {best_model['model_name']} "
+        f"with {primary_metric}: {best_model['metrics'][primary_metric]}"
+    )
 
     logger.info(f"Completed training for {len(results)} models.")
     return results

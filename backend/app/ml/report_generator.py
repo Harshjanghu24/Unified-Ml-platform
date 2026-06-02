@@ -10,12 +10,12 @@ Generates a downloadable PDF report containing:
   - Key visualizations
 """
 
-import os
-from datetime import datetime
-from fpdf import FPDF
 import base64
-from io import BytesIO
+import os
 import tempfile
+from datetime import datetime
+
+from fpdf import FPDF
 
 
 class MLReportPDF(FPDF):
@@ -24,7 +24,9 @@ class MLReportPDF(FPDF):
     def header(self):
         self.set_font("Helvetica", "B", 12)
         self.set_text_color(79, 70, 229)  # Indigo
-        self.cell(0, 10, "Unified Supervised Learning Platform", align="C", new_x="LMARGIN", new_y="NEXT")
+        self.cell(
+            0, 10, "Unified Supervised Learning Platform", align="C", new_x="LMARGIN", new_y="NEXT"
+        )
         self.set_draw_color(79, 70, 229)
         self.line(10, self.get_y(), 200, self.get_y())
         self.ln(5)
@@ -33,7 +35,15 @@ class MLReportPDF(FPDF):
         self.set_y(-15)
         self.set_font("Helvetica", "I", 8)
         self.set_text_color(128, 128, 128)
-        self.cell(0, 10, f"Page {self.page_no()}/{{nb}} | Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
+        self.cell(
+            0,
+            10,
+            (
+                f"Page {self.page_no()}/{{nb}} | "
+                f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            ),
+            align="C",
+        )
 
     def section_title(self, title):
         self.set_font("Helvetica", "B", 14)
@@ -160,7 +170,9 @@ def generate_report(
             name += " ★"
 
         pdf.cell(col_widths[0], 7, name, border=1, fill=True)
-        pdf.cell(col_widths[1], 7, str(result.get("training_time", "")), border=1, fill=True, align="C")
+        pdf.cell(
+            col_widths[1], 7, str(result.get("training_time", "")), border=1, fill=True, align="C"
+        )
 
         metrics = result.get("metrics", {})
         if problem_type in ("binary", "multiclass"):
@@ -187,18 +199,25 @@ def generate_report(
         if best_model.get("cv_scores"):
             for metric_name, scores in best_model["cv_scores"].items():
                 if isinstance(scores, dict):
-                    pdf.key_value(f"CV {metric_name}", f"{scores.get('mean', 'N/A')} ± {scores.get('std', 'N/A')}")
+                    pdf.key_value(
+                        f"CV {metric_name}",
+                        f"{scores.get('mean', 'N/A')} ± {scores.get('std', 'N/A')}",
+                    )
 
     # ── 5. Feature Selection ──
     if feature_selection:
         pdf.section_title("5. Feature Selection Results")
 
-        if "random_forest_importance" in feature_selection and isinstance(feature_selection["random_forest_importance"], list):
+        if "random_forest_importance" in feature_selection and isinstance(
+            feature_selection["random_forest_importance"], list
+        ):
             pdf.body_text("Top Features by Random Forest Importance:")
             for i, feat in enumerate(feature_selection["random_forest_importance"][:10], 1):
                 pdf.body_text(f"  {i}. {feat['feature']}: {feat['importance']}")
 
-        if "mutual_information" in feature_selection and isinstance(feature_selection["mutual_information"], list):
+        if "mutual_information" in feature_selection and isinstance(
+            feature_selection["mutual_information"], list
+        ):
             pdf.body_text("\nTop Features by Mutual Information:")
             for i, feat in enumerate(feature_selection["mutual_information"][:10], 1):
                 pdf.body_text(f"  {i}. {feat['feature']}: {feat['mi_score']}")

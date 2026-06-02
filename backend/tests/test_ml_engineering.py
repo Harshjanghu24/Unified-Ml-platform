@@ -1,22 +1,23 @@
-import pytest
-import pandas as pd
-import numpy as np
 import sys
 from unittest.mock import MagicMock, patch
+
+import numpy as np
+import pandas as pd
 
 # Mock mlflow before importing trainer if it's not installed
 mock_mlflow = MagicMock()
 mock_mlflow_sklearn = MagicMock()
-if 'mlflow' not in sys.modules:
-    sys.modules['mlflow'] = mock_mlflow
-    sys.modules['mlflow.sklearn'] = mock_mlflow_sklearn
+if "mlflow" not in sys.modules:
+    sys.modules["mlflow"] = mock_mlflow
+    sys.modules["mlflow.sklearn"] = mock_mlflow_sklearn
 
-from app.ml.trainer import train_models, HAS_XGBOOST
+from app.ml.trainer import HAS_XGBOOST, train_models  # noqa: E402
+
 
 def test_train_models_returns_reproducibility_metadata():
     # Setup simple binary classification data
-    X_train = pd.DataFrame(np.random.rand(10, 2), columns=['f1', 'f2'])
-    X_test = pd.DataFrame(np.random.rand(5, 2), columns=['f1', 'f2'])
+    X_train = pd.DataFrame(np.random.rand(10, 2), columns=["f1", "f2"])
+    X_test = pd.DataFrame(np.random.rand(5, 2), columns=["f1", "f2"])
     y_train = pd.Series([0, 1] * 5)
     y_test = pd.Series([0, 1, 0, 1, 0])
     problem_type = "binary"
@@ -34,11 +35,12 @@ def test_train_models_returns_reproducibility_metadata():
         if HAS_XGBOOST:
             assert "xgboost_version" in metadata
 
+
 @patch("app.ml.trainer.HAS_MLFLOW", True)
 def test_train_models_mlflow_integration():
     # Setup simple binary classification data
-    X_train = pd.DataFrame(np.random.rand(10, 2), columns=['f1', 'f2'])
-    X_test = pd.DataFrame(np.random.rand(5, 2), columns=['f1', 'f2'])
+    X_train = pd.DataFrame(np.random.rand(10, 2), columns=["f1", "f2"])
+    X_test = pd.DataFrame(np.random.rand(5, 2), columns=["f1", "f2"])
     y_train = pd.Series([0, 1] * 5)
     y_test = pd.Series([0, 1, 0, 1, 0])
     problem_type = "binary"
@@ -46,7 +48,7 @@ def test_train_models_mlflow_integration():
     with patch("app.ml.trainer.mlflow") as mock_mlflow_mod:
         # Configure mocks for context manager
         mock_mlflow_mod.start_run.return_value.__enter__.return_value = MagicMock()
-        
+
         train_models(X_train, X_test, y_train, y_test, problem_type)
 
         # Verify mlflow was called
@@ -56,11 +58,12 @@ def test_train_models_mlflow_integration():
         assert mock_mlflow_mod.sklearn.log_model.called
         assert mock_mlflow_mod.set_tag.called
 
+
 @patch("app.ml.trainer.HAS_MLFLOW", False)
 def test_train_models_no_mlflow_graceful():
     # Ensure it doesn't crash if MLflow is not present
-    X_train = pd.DataFrame(np.random.rand(10, 2), columns=['f1', 'f2'])
-    X_test = pd.DataFrame(np.random.rand(5, 2), columns=['f1', 'f2'])
+    X_train = pd.DataFrame(np.random.rand(10, 2), columns=["f1", "f2"])
+    X_test = pd.DataFrame(np.random.rand(5, 2), columns=["f1", "f2"])
     y_train = pd.Series([0, 1] * 5)
     y_test = pd.Series([0, 1, 0, 1, 0])
     problem_type = "binary"

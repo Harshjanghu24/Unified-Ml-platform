@@ -4,15 +4,18 @@ Generates SHAP summary plots and feature contribution explanations
 to answer: "Why did the model predict this output?"
 """
 
+import matplotlib
 import numpy as np
 import pandas as pd
 import shap
-import matplotlib
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import base64
-from io import BytesIO
 import warnings
+from io import BytesIO
+
+import matplotlib.pyplot as plt
+
 warnings.filterwarnings("ignore")
 
 
@@ -26,7 +29,9 @@ def _fig_to_base64(fig):
     return b64
 
 
-def generate_shap_explanations(model, X_train, X_test, feature_names, problem_type, max_samples=100):
+def generate_shap_explanations(
+    model, X_train, X_test, feature_names, problem_type, max_samples=100
+):
     """
     Generate SHAP explanations for the trained model.
 
@@ -40,7 +45,9 @@ def generate_shap_explanations(model, X_train, X_test, feature_names, problem_ty
 
     # Subsample for performance
     if len(X_test) > max_samples:
-        X_explain = X_test.iloc[:max_samples] if isinstance(X_test, pd.DataFrame) else X_test[:max_samples]
+        X_explain = (
+            X_test.iloc[:max_samples] if isinstance(X_test, pd.DataFrame) else X_test[:max_samples]
+        )
     else:
         X_explain = X_test
 
@@ -81,9 +88,7 @@ def generate_shap_explanations(model, X_train, X_test, feature_names, problem_ty
         fig.patch.set_facecolor("#0f172a")
 
         shap.summary_plot(
-            shap_for_plot, X_explain,
-            feature_names=feature_names,
-            show=False, max_display=15
+            shap_for_plot, X_explain, feature_names=feature_names, show=False, max_display=15
         )
 
         # Style the current figure
@@ -103,10 +108,12 @@ def generate_shap_explanations(model, X_train, X_test, feature_names, problem_ty
         # ── Feature Importance from SHAP ──
         importance_list = []
         for i, name in enumerate(feature_names):
-            importance_list.append({
-                "feature": name,
-                "mean_shap_value": round(float(shap_abs_mean[i]), 4),
-            })
+            importance_list.append(
+                {
+                    "feature": name,
+                    "mean_shap_value": round(float(shap_abs_mean[i]), 4),
+                }
+            )
         importance_list.sort(key=lambda x: x["mean_shap_value"], reverse=True)
         results["feature_importance"] = importance_list[:15]
 
@@ -173,12 +180,20 @@ def explain_single_prediction(model, instance, X_train, feature_names, problem_t
 
         contributions = []
         for i, name in enumerate(feature_names):
-            contributions.append({
-                "feature": name,
-                "shap_value": round(float(sv[i]), 4),
-                "feature_value": round(float(instance.iloc[0, i]) if isinstance(instance, pd.DataFrame)
-                                       else float(instance[0, i]), 4),
-            })
+            contributions.append(
+                {
+                    "feature": name,
+                    "shap_value": round(float(sv[i]), 4),
+                    "feature_value": round(
+                        (
+                            float(instance.iloc[0, i])
+                            if isinstance(instance, pd.DataFrame)
+                            else float(instance[0, i])
+                        ),
+                        4,
+                    ),
+                }
+            )
 
         contributions.sort(key=lambda x: abs(x["shap_value"]), reverse=True)
         return {"contributions": contributions[:10]}
