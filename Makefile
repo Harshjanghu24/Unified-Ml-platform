@@ -1,4 +1,4 @@
-.PHONY: install test lint run-backend run-frontend clean
+.PHONY: install test lint lint-fix run-backend run-frontend clean
 
 install:
 	cd backend && pip install -r requirements.txt && pip install -r requirements-dev.txt
@@ -11,6 +11,10 @@ test:
 lint:
 	cd backend && ruff check . && black --check .
 	cd frontend && npm run lint
+
+lint-fix:
+	cd backend && ruff check . --fix && black .
+	cd frontend && npm run lint -- --fix
 
 run-backend:
 	cd backend && uvicorn app.main:app --reload
