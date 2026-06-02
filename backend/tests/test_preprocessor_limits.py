@@ -4,44 +4,45 @@ import pandas as pd
 from app.ml.preprocessor import build_preprocessing_pipeline
 
 
-def test_no_high_cardinality_drop():
+def test_high_cardinality_drop():
     # Create data with high cardinality categorical column (> 20 unique values)
-    # 100 unique values
-    data = {"high_card": [f"val_{i}" for i in range(100)], "target": [0, 1] * 50}
+    # Plus a stable numeric feature so it doesn't crash
+    data = {
+        "high_card": [f"val_{i}" for i in range(100)],
+        "stable_feat": np.random.rand(100),
+        "target": [0, 1] * 50,
+    }
     df = pd.DataFrame(data)
 
     result = build_preprocessing_pipeline(df, "target")
 
-    # Verify high_card was NOT dropped.
-    # Since it is categorical, it should be one-hot encoded in X_raw.
-    assert any(col.startswith("high_card_") for col in result["X_raw"].columns)
+    # Verify high_card WAS dropped.
+    assert "high_card" not in result["X_raw"].columns
+    assert "stable_feat" in result["feature_names"]
 
 
-def test_no_id_column_drop():
+def test_id_column_drop():
     # Create data with an ID-like column
-    # 100% unique, named with 'id'
     data = {"user_id": [i for i in range(100)], "feat1": np.random.rand(100), "target": [0, 1] * 50}
     df = pd.DataFrame(data)
 
     result = build_preprocessing_pipeline(df, "target")
 
-    # Current behavior: user_id is dropped
-    # Desired behavior: user_id is kept
-    assert "user_id" in result["X_raw"].columns
+    # Verify user_id WAS dropped.
+    assert "user_id" not in result["X_raw"].columns
+    assert "feat1" in result["feature_names"]
 
 
-def test_no_feature_truncation():
+def test_feature_truncation():
     # Create data that will expand to > 500 features
-    # 60 categorical columns with 10 categories each -> 600 features
-    # Length 100
-    data = {}
+    # 1000 rows to keep cardinality ratio low (10/1000 = 0.01 < 0.05)
+    data = {"stable_feat": np.random.rand(1000)}
     for i in range(60):
-        data[f"cat_{i}"] = [f"val_{j}" for j in range(10)] * 10
-    data["target"] = [0, 1] * 50
+        data[f"cat_{i}"] = [f"val_{j}" for j in range(10)] * 100
+    data["target"] = [0, 1] * 500
     df = pd.DataFrame(data)
 
-    result = build_preprocessing_pipeline(df, "target")
+    result = build_preprocessing_pipeline(df, "target", "binary")
 
-    # Current behavior: truncated to 500
-    # Desired behavior: not truncated (should be around 600)
-    assert len(result["feature_names"]) > 500
+    # Verify truncated to 500
+    assert len(result["feature_names"]) == 500

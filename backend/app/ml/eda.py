@@ -55,12 +55,13 @@ def _fig_to_base64(fig):
     return b64
 
 
-def generate_histograms(df, target_column):
+def generate_histograms(df, target_column, max_cols=8):
     """Generate histograms for numeric columns."""
     _setup_style()
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
     if target_column in numeric_cols:
         numeric_cols.remove(target_column)
+    numeric_cols = numeric_cols[:max_cols]
 
     if not numeric_cols:
         return None
@@ -85,12 +86,13 @@ def generate_histograms(df, target_column):
     return _fig_to_base64(fig)
 
 
-def generate_box_plots(df, target_column):
+def generate_box_plots(df, target_column, max_cols=8):
     """Generate box plots for numeric columns."""
     _setup_style()
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
     if target_column in numeric_cols:
         numeric_cols.remove(target_column)
+    numeric_cols = numeric_cols[:max_cols]
 
     if not numeric_cols:
         return None
@@ -125,6 +127,10 @@ def generate_correlation_heatmap(df, target_column):
     numeric_df = df.select_dtypes(include=["int64", "float64"])
     if numeric_df.shape[1] < 2:
         return None
+
+    # Limit to 15 columns for readability
+    if numeric_df.shape[1] > 15:
+        numeric_df = numeric_df.iloc[:, :15]
 
     corr = numeric_df.corr()
     fig, ax = plt.subplots(figsize=(10, 8))

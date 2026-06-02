@@ -7,7 +7,6 @@ import os
 from typing import Any, Dict, Optional
 
 import joblib
-import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
@@ -135,7 +134,7 @@ async def predict_batch(file: UploadFile = File(...)):
     result = load_csv_from_bytes(content, filename=file.filename)
     if not result.success:
         raise HTTPException(status_code=400, detail=result.error)
-    
+
     df = result.df
 
     # Load pipeline

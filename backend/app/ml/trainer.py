@@ -248,13 +248,34 @@ def _tune_and_train(model_class, model_name, X_train, y_train, problem_type):
     """
     param_grid = PARAM_GRIDS.get(model_name, {})
 
-    # XGBoost models need special kwargs
+    # XGBoost and some scikit-learn models need special kwargs
     extra_kwargs = {}
+
+    # Apply class weights for imbalanced datasets in classification
+    if problem_type in ("binary", "multiclass"):
+        if model_name in ("LogisticRegression", "RandomForestClassifier", "DecisionTreeClassifier"):
+            extra_kwargs["class_weight"] = "balanced"
+
     if "XGB" in model_name:
         extra_kwargs = {
             "eval_metric": "logloss" if problem_type != "regression" else "rmse",
             "verbosity": 0,
         }
+        # For imbalanced XGBoost binary classification, we could use scale_pos_weight
+        # but for multiclass it's more complex. We'll stick to defaults for now
+        # unless it's binary.
+        if problem_type == "binary":
+            counts = y_train.value_counts()
+            if len(counts) == 2:
+                # scale_pos_weight = count(negative) / count(positive)
+                # LabelEncoder sorts labels, so 0 is first, 1 is second.
+                pos_label = 1
+                neg_label = 0
+                if pos_label in counts and neg_label in counts and counts[pos_label] > 0:
+                    extra_kwargs["scale_pos_weight"] = round(
+                        counts[neg_label] / counts[pos_label], 3
+                    )
+
         # Try to use GPU if available (XGBoost native CUDA detection)
         try:
             import xgboost as _xgb

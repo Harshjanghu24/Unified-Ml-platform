@@ -28,11 +28,11 @@ from ..logger import setup_logger
 logger = setup_logger(__name__)
 
 # ── Configurable limits ───────────────────────────────────────
-MAX_FILE_SIZE_MB: int = 500          # Hard reject above this
-CHUNK_THRESHOLD_MB: int = 50         # Use chunked reading above this
-MAX_COLUMNS: int = 2000              # Reject absurdly wide files
-SAMPLE_BYTES: int = 32_768           # Bytes to sniff for delimiter / encoding
-CHUNK_ROWS: int = 50_000             # Rows per chunk when reading large files
+MAX_FILE_SIZE_MB: int = 500  # Hard reject above this
+CHUNK_THRESHOLD_MB: int = 50  # Use chunked reading above this
+MAX_COLUMNS: int = 2000  # Reject absurdly wide files
+SAMPLE_BYTES: int = 32_768  # Bytes to sniff for delimiter / encoding
+CHUNK_ROWS: int = 50_000  # Rows per chunk when reading large files
 
 ENCODINGS_TO_TRY = ("utf-8", "utf-8-sig", "latin-1", "cp1252", "iso-8859-1")
 DELIMITERS_TO_TRY = (",", ";", "\t", "|")
@@ -167,9 +167,9 @@ def load_csv(filepath: str) -> CSVLoadResult:
         filepath_or_buffer=filepath,
         encoding=encoding,
         sep=delimiter,
-        on_bad_lines="warn",      # skip corrupt rows, log a warning
-        low_memory=True,          # parse in chunks internally
-        engine="c",               # fastest parser
+        on_bad_lines="warn",  # skip corrupt rows, log a warning
+        low_memory=True,  # parse in chunks internally
+        engine="c",  # fastest parser
         na_values=["", "NA", "N/A", "null", "NULL", "NaN", "nan", "None", "none", "-"],
     )
 
@@ -303,7 +303,7 @@ def load_csv_from_bytes(content: bytes, filename: str = "<upload>") -> CSVLoadRe
     logger.info(f"CSV buffer load — {filename} ({result.file_size_mb} MB)")
 
     # Detect encoding + delimiter from the buffer
-    sample = content[: SAMPLE_BYTES]
+    sample = content[:SAMPLE_BYTES]
     encoding = _detect_encoding(sample)
     result.detected_encoding = encoding
 
@@ -350,7 +350,5 @@ def load_csv_from_bytes(content: bytes, filename: str = "<upload>") -> CSVLoadRe
     result.col_count = df.shape[1]
     result.memory_usage_mb = round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2)
 
-    logger.info(
-        f"Buffer CSV loaded — {result.row_count:,} rows × {result.col_count} cols"
-    )
+    logger.info(f"Buffer CSV loaded — {result.row_count:,} rows × {result.col_count} cols")
     return result

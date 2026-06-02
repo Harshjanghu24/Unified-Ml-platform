@@ -34,7 +34,8 @@ Building ML models typically requires manual exploration, expert knowledge for p
 | 11 | Downloadable PDF report generation | ✅ |
 | 12 | GPU (CUDA) acceleration for XGBoost | ✅ |
 | 13 | Asynchronous background training with progress tracking | ✅ |
-| 14 | Modern, responsive React frontend | ✅ |
+| 14 | Memory-safe preprocessing with cardinality guards | ✅ |
+| 15 | Modern, responsive React frontend | ✅ |
 
 ---
 
@@ -138,7 +139,7 @@ Phase 9: Documentation     → README, PLAN.md, ARCHITECTURE.md
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Large datasets cause memory overflow | High | Chunked upload |
+| Large datasets cause memory overflow | High | Cardinality limits, feature cap at 500, chunked upload |
 | Long training blocks server | High | Async background tasks with progress polling |
 | Non-numeric target labels crash metrics | High | Automated LabelEncoder before training |
 | XGBoost not installed | Medium | Graceful fallback — excluded if unavailable |

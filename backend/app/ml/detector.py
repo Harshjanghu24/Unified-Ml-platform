@@ -26,8 +26,12 @@ def detect_problem_type(df: pd.DataFrame, target_column: str) -> str:
     n_unique = target.nunique()
     dtype = target.dtype
 
-    # Categorical / object columns
-    if dtype == "object" or isinstance(dtype, pd.CategoricalDtype):
+    # Categorical / string columns
+    if (
+        dtype == "object"
+        or isinstance(dtype, pd.CategoricalDtype)
+        or pd.api.types.is_string_dtype(dtype)
+    ):
         if n_unique == 2:
             return "binary"
         return "multiclass"
@@ -41,9 +45,12 @@ def detect_problem_type(df: pd.DataFrame, target_column: str) -> str:
         return "multiclass"
 
     # Check if float values are actually class labels (e.g. 0.0, 1.0, 2.0)
-    if n_unique <= 20:
-        if np.all(target == target.astype(int)):
-            return "multiclass"
+    if n_unique <= 20 and pd.api.types.is_numeric_dtype(dtype):
+        try:
+            if np.all(target == target.astype(int)):
+                return "multiclass"
+        except (ValueError, TypeError):
+            pass
 
     return "regression"
 

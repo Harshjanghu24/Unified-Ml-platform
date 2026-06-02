@@ -255,12 +255,14 @@ Target Column Analysis:
 
 ```
 Step 1: Separate features (X) and target (y)
-Step 2: Identify numeric vs categorical columns
-Step 3: Handle missing values (mean for numeric, mode for categorical)
-Step 4: One-Hot Encode categorical features (drop_first=False)
-Step 5: Label Encode target for classification problems
-Step 6: StandardScaler on all features
-Step 7: Train-Test Split (80/20, stratified when ≤20 classes)
+Step 2: Drop high-cardinality columns (>20 unique categorical, ID columns)
+Step 3: Identify numeric vs categorical columns
+Step 4: Impute missing values (mean for numeric, most_frequent for categorical)
+Step 5: One-Hot Encode categorical features (drop_first=False)
+Step 6: Guard against feature explosion (cap at 500 columns)
+Step 7: Label Encode target for classification problems
+Step 8: StandardScaler on all features
+Step 9: Train-Test Split (80/20, stratified when ≤20 classes)
 ```
 
 ### 5.3 Training Engine (`trainer.py`)

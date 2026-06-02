@@ -34,6 +34,30 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
     y = df[target_column].copy()
     steps_log.append(f"Separated target column '{target_column}' from {X.shape[1]} features.")
 
+    # ── Drop High-Cardinality & Unique Identifier Columns ──
+    dropped_cols = []
+    for col in X.columns:
+        n_unique = X[col].nunique()
+        # Drop categorical/text columns with > 20 unique values or high unique ratio
+        if (
+            X[col].dtype == "object"
+            or isinstance(X[col].dtype, pd.CategoricalDtype)
+            or pd.api.types.is_string_dtype(X[col].dtype)
+        ):
+            if n_unique > 20 or (n_unique / len(X) > 0.05 and len(X) > 50):
+                dropped_cols.append(col)
+        # Drop numeric integer columns that are purely unique keys (like indices, row IDs)
+        elif pd.api.types.is_integer_dtype(X[col].dtype):
+            if n_unique == len(X) and any(kw in col.lower() for kw in ["id", "key", "index", "no"]):
+                dropped_cols.append(col)
+
+    if dropped_cols:
+        X = X.drop(columns=dropped_cols)
+        steps_log.append(
+            "Dropped high-cardinality/identifier columns to prevent model "
+            f"degradation: {', '.join(dropped_cols)}"
+        )
+
     # ── 2. Identify column types ──
     numeric_cols = X.select_dtypes(
         include=["int64", "float64", "int32", "float32"]
@@ -73,6 +97,15 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
             f"{X.shape[1]} total features."
         )
 
+    # ── Protect Against Feature Explosion ──
+    if X.shape[1] > 500:
+        steps_log.append(
+            f"Feature count too high ({X.shape[1]}). "
+            "Truncating to 500 to prevent model degradation."
+        )
+        # Keep the first 500 features.
+        X = X.iloc[:, :500]
+
     # ── 5. Encode target (for classification) ──
     label_encoder = None
     if problem_type in ("binary", "multiclass"):
@@ -86,6 +119,15 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
 
     # ── 6. Scale numeric features ──
     feature_names = X.columns.tolist()
+    if not feature_names:
+        steps_log.append("Warning: No features remaining after preprocessing.")
+        # Create a dummy feature to prevent downstream crashes if necessary,
+        # but better to let it fail or handle it at training.
+        # For now, we'll raise an informative error if we hit this.
+        raise ValueError(
+            "No features remaining after preprocessing. All columns were either dropped as high-cardinality/IDs or were empty."
+        )
+
     scaler = StandardScaler()
     X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=feature_names, index=X.index)
     steps_log.append(f"Applied StandardScaler to all {len(feature_names)} features.")
