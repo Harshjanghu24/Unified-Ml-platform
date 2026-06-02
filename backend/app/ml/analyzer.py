@@ -14,8 +14,8 @@ Scoring Components:
   - Cardinality Score
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from scipy.stats import entropy as scipy_entropy
 
 

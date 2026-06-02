@@ -5,17 +5,19 @@ Includes histograms, box plots, correlation heatmap, scatter plots,
 confusion matrix, ROC curves, actual vs predicted, and residual plots.
 """
 
-import pandas as pd
-import numpy as np
 import matplotlib
+import numpy as np
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import roc_curve, auc
-from sklearn.preprocessing import label_binarize
-from io import BytesIO
 import base64
 import warnings
+from io import BytesIO
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import auc, roc_curve
+from sklearn.preprocessing import label_binarize
+
 warnings.filterwarnings("ignore")
 
 # ── Theme ────────────────────────────────────────────────────
@@ -28,17 +30,19 @@ GRID_COLOR = "#334155"
 
 def _setup_style():
     """Apply dark theme globally."""
-    plt.rcParams.update({
-        "figure.facecolor": BG_COLOR,
-        "axes.facecolor": CARD_COLOR,
-        "axes.edgecolor": GRID_COLOR,
-        "axes.labelcolor": TEXT_COLOR,
-        "text.color": TEXT_COLOR,
-        "xtick.color": TEXT_COLOR,
-        "ytick.color": TEXT_COLOR,
-        "grid.color": GRID_COLOR,
-        "font.size": 10,
-    })
+    plt.rcParams.update(
+        {
+            "figure.facecolor": BG_COLOR,
+            "axes.facecolor": CARD_COLOR,
+            "axes.edgecolor": GRID_COLOR,
+            "axes.labelcolor": TEXT_COLOR,
+            "text.color": TEXT_COLOR,
+            "xtick.color": TEXT_COLOR,
+            "ytick.color": TEXT_COLOR,
+            "grid.color": GRID_COLOR,
+            "font.size": 10,
+        }
+    )
 
 
 def _fig_to_base64(fig):
@@ -133,9 +137,18 @@ def generate_correlation_heatmap(df, target_column):
 
     mask = np.triu(np.ones_like(corr, dtype=bool))
     cmap = sns.color_palette("coolwarm", as_cmap=True)
-    sns.heatmap(corr, mask=mask, annot=True, fmt=".2f", cmap=cmap,
-                center=0, ax=ax, linewidths=0.5, linecolor=GRID_COLOR,
-                cbar_kws={"shrink": 0.8})
+    sns.heatmap(
+        corr,
+        mask=mask,
+        annot=True,
+        fmt=".2f",
+        cmap=cmap,
+        center=0,
+        ax=ax,
+        linewidths=0.5,
+        linecolor=GRID_COLOR,
+        cbar_kws={"shrink": 0.8},
+    )
 
     ax.set_title("Correlation Heatmap", fontsize=14, fontweight="bold")
     fig.tight_layout()
@@ -155,7 +168,9 @@ def generate_target_distribution(df, target_column, problem_type):
         ax.set_ylabel("Count")
         ax.set_title(f"Target Distribution: {target_column}", fontsize=14, fontweight="bold")
     else:
-        ax.hist(df[target_column].dropna(), bins=40, color=ACCENT_COLOR, alpha=0.8, edgecolor="#6366f1")
+        ax.hist(
+            df[target_column].dropna(), bins=40, color=ACCENT_COLOR, alpha=0.8, edgecolor="#6366f1"
+        )
         ax.set_xlabel(target_column)
         ax.set_ylabel("Frequency")
         ax.set_title(f"Target Distribution: {target_column}", fontsize=14, fontweight="bold")
@@ -212,9 +227,17 @@ def generate_confusion_matrix_plot(confusion_mat, class_labels=None):
     cm = np.array(confusion_mat)
     xticklabels = class_labels if class_labels is not None else "auto"
     yticklabels = class_labels if class_labels is not None else "auto"
-    sns.heatmap(cm, annot=True, fmt="d", cmap="viridis", ax=ax,
-                linewidths=1, linecolor=GRID_COLOR,
-                xticklabels=xticklabels, yticklabels=yticklabels)
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="viridis",
+        ax=ax,
+        linewidths=1,
+        linecolor=GRID_COLOR,
+        xticklabels=xticklabels,
+        yticklabels=yticklabels,
+    )
     ax.set_xlabel("Predicted", fontsize=12)
     ax.set_ylabel("Actual", fontsize=12)
     ax.set_title("Confusion Matrix", fontsize=14, fontweight="bold")
@@ -233,10 +256,10 @@ def generate_roc_curve(model, X_test, y_test, n_classes):
 
     if n_classes == 2:
         y_proba = model.predict_proba(X_test)[:, 1]
-        
+
         unique_vals = list(set(y_test))
         pos_label = 1 if 1 in unique_vals else (unique_vals[-1] if unique_vals else 1)
-        
+
         fpr, tpr, _ = roc_curve(y_test, y_proba, pos_label=pos_label)
         roc_auc = auc(fpr, tpr)
 
@@ -251,8 +274,7 @@ def generate_roc_curve(model, X_test, y_test, n_classes):
         for i in range(min(n_classes, y_bin.shape[1])):
             fpr, tpr, _ = roc_curve(y_bin[:, i], y_proba[:, i])
             roc_auc = auc(fpr, tpr)
-            ax.plot(fpr, tpr, color=colors[i], lw=2,
-                    label=f"Class {i} (AUC = {roc_auc:.3f})")
+            ax.plot(fpr, tpr, color=colors[i], lw=2, label=f"Class {i} (AUC = {roc_auc:.3f})")
 
         ax.plot([0, 1], [0, 1], "w--", lw=1, alpha=0.5)
 
@@ -278,7 +300,9 @@ def generate_actual_vs_predicted(y_test, y_pred):
     # Perfect prediction line
     min_val = min(min(y_test), min(y_pred))
     max_val = max(max(y_test), max(y_pred))
-    ax.plot([min_val, max_val], [min_val, max_val], "w--", lw=2, alpha=0.7, label="Perfect Prediction")
+    ax.plot(
+        [min_val, max_val], [min_val, max_val], "w--", lw=2, alpha=0.7, label="Perfect Prediction"
+    )
 
     ax.set_xlabel("Actual Values", fontsize=12)
     ax.set_ylabel("Predicted Values", fontsize=12)

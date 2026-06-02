@@ -5,7 +5,6 @@ for automatic feature ranking and selection.
 """
 
 import numpy as np
-import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.feature_selection import (
     chi2,
@@ -32,11 +31,13 @@ def chi_square_selection(X_train, y_train, feature_names, top_n=10):
     for i, name in enumerate(feature_names):
         c_score = float(chi2_scores[i])
         p_val = float(p_values[i])
-        results.append({
-            "feature": name,
-            "chi2_score": round(c_score, 4) if not np.isnan(c_score) else 0.0,
-            "p_value": round(p_val, 6) if not np.isnan(p_val) else 1.0,
-        })
+        results.append(
+            {
+                "feature": name,
+                "chi2_score": round(c_score, 4) if not np.isnan(c_score) else 0.0,
+                "p_value": round(p_val, 6) if not np.isnan(p_val) else 1.0,
+            }
+        )
 
     results.sort(key=lambda x: x["chi2_score"], reverse=True)
     return results[:top_n]
@@ -58,10 +59,12 @@ def mutual_information_selection(X_train, y_train, feature_names, problem_type, 
     results = []
     for i, name in enumerate(feature_names):
         mi_score = float(mi_scores[i])
-        results.append({
-            "feature": name,
-            "mi_score": round(mi_score, 4) if not np.isnan(mi_score) else 0.0,
-        })
+        results.append(
+            {
+                "feature": name,
+                "mi_score": round(mi_score, 4) if not np.isnan(mi_score) else 0.0,
+            }
+        )
 
     results.sort(key=lambda x: x["mi_score"], reverse=True)
     return results[:top_n]
@@ -85,10 +88,12 @@ def random_forest_importance(X_train, y_train, feature_names, problem_type, top_
     results = []
     for i, name in enumerate(feature_names):
         importance = float(importances[i])
-        results.append({
-            "feature": name,
-            "importance": round(importance, 4) if not np.isnan(importance) else 0.0,
-        })
+        results.append(
+            {
+                "feature": name,
+                "importance": round(importance, 4) if not np.isnan(importance) else 0.0,
+            }
+        )
 
     results.sort(key=lambda x: x["importance"], reverse=True)
     return results[:top_n]

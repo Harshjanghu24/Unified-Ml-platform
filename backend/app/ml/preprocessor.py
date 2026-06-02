@@ -5,14 +5,8 @@ Returns processed data along with a fitted pipeline for prediction reuse.
 """
 
 import pandas as pd
-import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-import joblib
-import os
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 
 def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_type: str = None):
@@ -44,24 +38,33 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
     dropped_cols = []
     for col in X.columns:
         n_unique = X[col].nunique()
-        # Stricter memory limit: Drop categorical/text columns with > 20 unique values or high unique ratio
+        # Stricter memory limit:
+        # drop categorical/text columns with > 20 unique values or high unique ratio.
         if X[col].dtype == "object" or pd.api.types.is_categorical_dtype(X[col].dtype):
             if n_unique > 20 or (n_unique / len(X) > 0.05 and len(X) > 50):
                 dropped_cols.append(col)
         # Drop numeric integer columns that are purely unique keys (like indices, row IDs)
         elif pd.api.types.is_integer_dtype(X[col].dtype):
-            # If it's a primary key/unique ID column (100% unique values) and has 'id' or 'key' in name
+            # If it's a primary key/unique ID column (100% unique values)
+            # and has 'id' or 'key' in name.
             if n_unique == len(X) and any(kw in col.lower() for kw in ["id", "key", "index", "no"]):
                 dropped_cols.append(col)
 
     if dropped_cols:
         X = X.drop(columns=dropped_cols)
-        steps_log.append(f"Dropped high-cardinality/identifier columns to prevent memory overflow: {', '.join(dropped_cols)}")
+        steps_log.append(
+            "Dropped high-cardinality/identifier columns to prevent memory "
+            f"overflow: {', '.join(dropped_cols)}"
+        )
 
     # ── 2. Identify column types ──
-    numeric_cols = X.select_dtypes(include=["int64", "float64", "int32", "float32"]).columns.tolist()
+    numeric_cols = X.select_dtypes(
+        include=["int64", "float64", "int32", "float32"]
+    ).columns.tolist()
     categorical_cols = X.select_dtypes(include=["object", "category", "bool"]).columns.tolist()
-    steps_log.append(f"Identified {len(numeric_cols)} numeric and {len(categorical_cols)} categorical features.")
+    steps_log.append(
+        f"Identified {len(numeric_cols)} numeric and {len(categorical_cols)} categorical features."
+    )
 
     # ── 3. Handle missing values ──
     missing_before = int(X.isna().sum().sum())
@@ -71,7 +74,9 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
         if categorical_cols:
             for col in categorical_cols:
                 X[col] = X[col].fillna(X[col].mode()[0] if not X[col].mode().empty else "Unknown")
-        steps_log.append(f"Imputed {missing_before} missing values (mean for numeric, mode for categorical).")
+        steps_log.append(
+            f"Imputed {missing_before} missing values (mean for numeric, mode for categorical)."
+        )
     else:
         steps_log.append("No missing values found in features.")
 
@@ -86,12 +91,19 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
     # ── 4. Encode categorical features ──
     if categorical_cols:
         X = pd.get_dummies(X, columns=categorical_cols, drop_first=False)
-        steps_log.append(f"One-Hot Encoded {len(categorical_cols)} categorical columns → {X.shape[1]} total features.")
-    
+        steps_log.append(
+            f"One-Hot Encoded {len(categorical_cols)} categorical columns → "
+            f"{X.shape[1]} total features."
+        )
+
     # ── Protect Against Feature Explosion ──
     if X.shape[1] > 500:
-        steps_log.append(f"Feature count too high ({X.shape[1]}). Truncating to 500 to prevent memory exhaustion.")
-        # Only keep top 500 features (you would ideally use feature selection here, but for preprocessor we just slice or keep numeric)
+        steps_log.append(
+            f"Feature count too high ({X.shape[1]}). "
+            "Truncating to 500 to prevent memory exhaustion."
+        )
+        # Only keep top 500 features. You would ideally use feature selection
+        # here, but for preprocessor we just keep the first 500.
         # For simplicity, we just keep the first 500
         X = X.iloc[:, :500]
 
@@ -101,7 +113,9 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
         label_encoder = LabelEncoder()
         y = pd.Series(label_encoder.fit_transform(y), index=y.index, name=target_column)
         steps_log.append(f"Label Encoded target column. Classes: {list(label_encoder.classes_)}")
-    elif problem_type is None and (y.dtype == "object" or pd.api.types.is_categorical_dtype(y.dtype)):
+    elif problem_type is None and (
+        y.dtype == "object" or pd.api.types.is_categorical_dtype(y.dtype)
+    ):
         label_encoder = LabelEncoder()
         y = pd.Series(label_encoder.fit_transform(y), index=y.index, name=target_column)
         steps_log.append(f"Label Encoded target column. Classes: {list(label_encoder.classes_)}")
@@ -116,7 +130,9 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
     X_train, X_test, y_train, y_test = train_test_split(
         X_scaled, y, test_size=0.2, random_state=42, stratify=y if y.nunique() <= 20 else None
     )
-    steps_log.append(f"Split data: {len(X_train)} training samples, {len(X_test)} testing samples (80/20).")
+    steps_log.append(
+        f"Split data: {len(X_train)} training samples, {len(X_test)} testing samples (80/20)."
+    )
 
     return {
         "X_train": X_train,

@@ -4,8 +4,8 @@ Analyzes the target column of a dataset to determine whether
 the problem is Binary Classification, Multi-Class Classification, or Regression.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 def detect_problem_type(df: pd.DataFrame, target_column: str) -> str:
