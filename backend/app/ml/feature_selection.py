@@ -4,10 +4,14 @@ Implements Chi-Square Test, Mutual Information, and Random Forest Feature Import
 for automatic feature ranking and selection.
 """
 
-import pandas as pd
 import numpy as np
-from sklearn.feature_selection import chi2, mutual_info_classif, mutual_info_regression
+import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.feature_selection import (
+    chi2,
+    mutual_info_classif,
+    mutual_info_regression,
+)
 from sklearn.preprocessing import MinMaxScaler
 
 
