@@ -123,6 +123,18 @@ unified-ml-platform/
 
 ---
 
+## 📖 Documentation
+
+For detailed information on the platform's design and operation, please refer to the following guides:
+
+- **[Architecture Guide](docs/architecture.md)**: Deep dive into the system components and data flow.
+- **[API Reference](docs/api.md)**: Detailed documentation for all REST API endpoints.
+- **[Deployment Guide](docs/deployment.md)**: Instructions for setting up and deploying the platform.
+- **[Troubleshooting Guide](docs/troubleshooting.md)**: Common issues and their solutions.
+- **[Architectural Decision Records (ADR)](docs/adr/)**: History of key technical decisions.
+
+---
+
 ## 🚀 Installation & Setup
 
 ### Prerequisites
