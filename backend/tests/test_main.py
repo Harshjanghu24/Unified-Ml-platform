@@ -4,6 +4,9 @@ import pytest
 
 os.environ["TESTING"] = "True"
 
+from app.config import get_settings
+get_settings.cache_clear()
+
 from fastapi.testclient import TestClient
 
 from app.database import get_db_path

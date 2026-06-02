@@ -58,7 +58,7 @@ Unlike traditional AutoML tools, this platform **does NOT require users to manua
 
 | Layer | Technology |
 |-------|-----------|
-| **Backend** | Python 3.9+, FastAPI, Uvicorn |
+| **Backend** | Python 3.12, FastAPI, Uvicorn |
 | **ML/AI** | Scikit-Learn, XGBoost, SHAP |
 | **Data Processing** | Pandas, NumPy, SciPy |
 | **Visualization** | Matplotlib, Seaborn |
@@ -138,7 +138,7 @@ For detailed information on the platform's design and operation, please refer to
 ## 🚀 Installation & Setup
 
 ### Prerequisites
-- **Python** 3.9 or higher
+- **Python** 3.12.4
 - **Node.js** 18 or higher
 - **pip** (Python package manager)
 - **npm** (Node package manager)

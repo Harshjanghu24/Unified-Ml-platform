@@ -106,7 +106,6 @@ def _log_to_mlflow(model_name, model, params, metrics, problem_type):
 PARAM_GRIDS = {
     "LogisticRegression": {
         "C": [0.01, 0.1, 1, 10],
-        "penalty": ["l2"],
         "solver": ["lbfgs"],
         "max_iter": [1000],
     },
