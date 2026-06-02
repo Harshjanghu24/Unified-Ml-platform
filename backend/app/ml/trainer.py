@@ -8,8 +8,11 @@ Supports XGBoost along with scikit-learn models.
 """
 
 import time
+import sys
+import platform
 import numpy as np
 import pandas as pd
+import sklearn
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.tree import DecisionTreeClassifier
@@ -27,8 +30,56 @@ try:
 except ImportError:
     HAS_XGBOOST = False
 
+try:
+    import mlflow
+    import mlflow.sklearn
+    HAS_MLFLOW = True
+except ImportError:
+    HAS_MLFLOW = False
+
 from ..logger import setup_logger
 logger = setup_logger(__name__)
+
+
+def _get_reproducibility_metadata():
+    """Capture environment metadata for reproducibility."""
+    metadata = {
+        "python_version": sys.version,
+        "platform": platform.platform(),
+        "sklearn_version": sklearn.__version__,
+        "pandas_version": pd.__version__,
+        "numpy_version": np.__version__,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    return metadata
+
+
+def _log_to_mlflow(model_name, model, params, metrics, problem_type):
+    """Log parameters, metrics, and model to MLflow."""
+    if not HAS_MLFLOW:
+        return
+
+    try:
+        # Start a new MLflow run if one isn't already active
+        if not mlflow.active_run():
+            mlflow.start_run(run_name=f"{model_name}_{int(time.time())}")
+
+        # Log parameters
+        if params:
+            mlflow.log_params(params)
+
+        # Log metrics
+        # Filter out non-numeric metrics like confusion_matrix or classification_report
+        numeric_metrics = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
+        mlflow.log_metrics(numeric_metrics)
+
+        # Log model
+        mlflow.sklearn.log_model(model, "model")
+
+        # End the run if we started it here
+        mlflow.end_run()
+    except Exception as e:
+        logger.warning(f"Failed to log to MLflow for {model_name}: {str(e)}")
 
 
 # ── Hyperparameter grids ─────────────────────────────────────
@@ -268,6 +319,7 @@ def train_models(X_train, X_test, y_train, y_test, problem_type):
 
     results = []
     n_classes = int(y_train.nunique()) if problem_type != "regression" else 0
+    repro_metadata = _get_reproducibility_metadata()
 
     for model_name, model_class in model_configs:
         logger.info(f"Training model: {model_name}")
@@ -289,6 +341,9 @@ def train_models(X_train, X_test, y_train, y_test, problem_type):
         # Cross Validation
         cv_scores = _cross_validate(model, X_train, y_train, problem_type, cv=5)
 
+        # MLflow Logging
+        _log_to_mlflow(model_name, model, best_params, metrics, problem_type)
+
         results.append({
             "model_name": model_name,
             "model_object": model,
@@ -297,6 +352,7 @@ def train_models(X_train, X_test, y_train, y_test, problem_type):
             "best_params": best_params,
             "best_search_score": best_search_score,
             "cv_scores": cv_scores,
+            "reproducibility_metadata": repro_metadata,
         })
 
     # Determine best model
