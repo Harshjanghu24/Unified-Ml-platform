@@ -36,6 +36,14 @@ We love your input! We want to make contributing to this project as easy and tra
    ```bash
    npm install
    ```
+3. Run development server:
+   ```bash
+   npm run dev
+   ```
+4. Build for production:
+   ```bash
+   npm run build
+   ```
 
 ## Development Workflow
 
@@ -47,11 +55,21 @@ We love your input! We want to make contributing to this project as easy and tra
 6. Issue that pull request!
 
 ### Running Tests
+
+#### Backend Tests
 We use `pytest` for backend testing.
 ```bash
 cd backend
 pytest
 ```
+
+#### Frontend Tests
+We use `vitest` and `React Testing Library` for frontend testing.
+```bash
+cd frontend
+npm test
+```
+*Note: The frontend test suite is currently being established.*
 
 ### Linting and Formatting
 We use `ruff` for linting and `black` for formatting.
