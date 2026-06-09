@@ -131,10 +131,11 @@ def _run_training_pipeline_task(
             cols_to_keep = list(set(matched_cols))
             if target_column not in cols_to_keep:
                 cols_to_keep.append(target_column)
-
             df = df[cols_to_keep]
             feature_names = [c for c in df.columns if c != target_column]
-            _jobs[job_id]["progress"] = f"Filtering to {len(selected_features)} user-selected features..."
+            _jobs[job_id][
+                "progress"
+            ] = f"Filtering to {len(selected_features)} user-selected features..."
 
         # ── Train-Test Split ──
         _jobs[job_id]["progress"] = "Splitting dataset into train & test sets..."

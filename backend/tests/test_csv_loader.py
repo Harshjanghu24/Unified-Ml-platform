@@ -116,7 +116,8 @@ def test_load_inconsistent_delimiters(temp_csv):
     content = "a,b,c\n1;2;3\n4;5;6\n"
     write_to_path(temp_csv, content)
 
-    # The sniffer might detect comma from the header, so the body will be read as a single column '1;2;3'.
+    # The sniffer might detect comma from the header,
+    # so the body will be read as a single column '1;2;3'.
     # Our robust loader shouldn't crash, it just parses it weirdly, which is expected.
     result = load_csv(temp_csv)
     assert result.success

@@ -169,7 +169,8 @@ ALGORITHM_MAP = {
 
 # Add XGBoost entries if available
 if HAS_XGBOOST:
-    from xgboost import XGBClassifier as _XGBCls, XGBRegressor as _XGBReg
+    from xgboost import XGBClassifier as _XGBCls
+    from xgboost import XGBRegressor as _XGBReg
 
     ALGORITHM_MAP["binary"]["XGBoost"] = (_XGBCls, "XGBClassifier")
     ALGORITHM_MAP["multiclass"]["XGBoost"] = (_XGBCls, "XGBClassifier")
