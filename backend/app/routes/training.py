@@ -6,10 +6,12 @@ hyperparameter tuning, and cross-validation orchestration.
 
 import os
 import uuid
+from typing import Optional
 
 import joblib
 import psutil
 from fastapi import APIRouter, BackgroundTasks, HTTPException
+from pydantic import BaseModel
 
 from ..database import save_model_record
 from ..ml.eda import (
@@ -22,7 +24,7 @@ from ..ml.eda import (
 from ..ml.explainability import generate_shap_explanations
 from ..ml.feature_selection import run_feature_selection
 from ..ml.preprocessor import build_preprocessing_pipeline
-from ..ml.trainer import train_models
+from ..ml.trainer import get_available_algorithms, train_models, train_single_model
 from ..routes.dataset import get_current_dataset
 
 router = APIRouter(prefix="/api", tags=["Training"])
@@ -41,13 +43,35 @@ MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "m
 os.makedirs(MODELS_DIR, exist_ok=True)
 
 
-def _run_training_pipeline_task(job_id: str, dataset: dict):
+class TrainRequest(BaseModel):
+    """Request body for the /train endpoint."""
+
+    algorithm: Optional[str] = None  # e.g. "Random Forest", "XGBoost"
+    features: Optional[list[str]] = None  # e.g. ["Age", "BMI", "BloodPressure"]
+
+
+def _run_training_pipeline_task(
+    job_id: str, dataset: dict, algorithm: str = None, selected_features: list = None
+):
     """Background task to run the ML pipeline."""
     try:
-        df = dataset["df"]
+        df = dataset["df"].copy()
         target_column = dataset["target_column"]
         problem_type = dataset["problem_type"]
         dataset_id = dataset["dataset_id"]
+
+        # ── Feature Filtering: keep only user-selected columns + target ──
+        if selected_features:
+            # Validate that all requested features exist in the dataframe
+            missing = [f for f in selected_features if f not in df.columns]
+            if missing:
+                raise ValueError(f"Selected features not found in dataset: {missing}")
+            # Keep only the selected features plus the target column
+            cols_to_keep = selected_features + [target_column]
+            df = df[cols_to_keep]
+            _jobs[job_id]["progress"] = (
+                f"Filtering to {len(selected_features)} user-selected features..."
+            )
 
         _jobs[job_id]["progress"] = "Step 1: Preprocessing data..."
         prep_result = build_preprocessing_pipeline(df, target_column, problem_type)
@@ -69,8 +93,15 @@ def _run_training_pipeline_task(job_id: str, dataset: dict):
         except Exception as e:
             feature_selection = {"error": str(e)}
 
-        _jobs[job_id]["progress"] = "Step 3: Training Models (this may take a while)..."
-        model_results = train_models(X_train, X_test, y_train, y_test, problem_type)
+        # ── Algorithm Selection: single model or all ──
+        if algorithm:
+            _jobs[job_id]["progress"] = f"Step 3: Training {algorithm}..."
+            model_results = train_single_model(
+                X_train, X_test, y_train, y_test, problem_type, algorithm
+            )
+        else:
+            _jobs[job_id]["progress"] = "Step 3: Training Models (this may take a while)..."
+            model_results = train_models(X_train, X_test, y_train, y_test, problem_type)
 
         _jobs[job_id]["progress"] = "Step 4: Generating Evaluation Plots..."
         eval_plots = {}
@@ -185,12 +216,16 @@ def _run_training_pipeline_task(job_id: str, dataset: dict):
 
 
 @router.post("/train")
-async def train(background_tasks: BackgroundTasks):
+async def train(background_tasks: BackgroundTasks, body: TrainRequest = None):
     dataset = get_current_dataset()
     if dataset.get("df") is None:
         raise HTTPException(
             status_code=400, detail="No dataset uploaded. Please upload a dataset first."
         )
+
+    # Extract optional manual selections from request body
+    algorithm = body.algorithm if body else None
+    selected_features = body.features if body else None
 
     job_id = str(uuid.uuid4())
     _jobs[job_id] = {
@@ -199,8 +234,62 @@ async def train(background_tasks: BackgroundTasks):
         "result": None,
         "error": None,
     }
-    background_tasks.add_task(_run_training_pipeline_task, job_id, dataset)
-    return {"job_id": job_id, "message": "Training started in the background."}
+    background_tasks.add_task(
+        _run_training_pipeline_task, job_id, dataset, algorithm, selected_features
+    )
+
+    msg = "Training started in the background."
+    if algorithm:
+        msg = f"Training '{algorithm}' in the background."
+    return {"job_id": job_id, "message": msg}
+
+
+@router.get("/training-options")
+async def get_training_options():
+    """
+    Return available algorithms and feature columns for the current dataset.
+    Called by the frontend to populate the algorithm dropdown and feature checkboxes.
+    """
+    dataset = get_current_dataset()
+    if dataset.get("df") is None:
+        raise HTTPException(status_code=400, detail="No dataset uploaded.")
+
+    df = dataset["df"]
+    target_column = dataset.get("target_column")
+    problem_type = dataset.get("problem_type")
+
+    if not target_column or not problem_type:
+        raise HTTPException(
+            status_code=400, detail="No target column selected. Please select a target first."
+        )
+
+    # Get all columns except the target
+    all_columns = [col for col in df.columns if col != target_column]
+
+    # Classify columns by type for the UI
+    feature_info = []
+    for col in all_columns:
+        dtype = str(df[col].dtype)
+        n_unique = int(df[col].nunique())
+        missing_pct = round(float(df[col].isna().mean() * 100), 1)
+        feature_info.append(
+            {
+                "name": col,
+                "dtype": dtype,
+                "unique_values": n_unique,
+                "missing_pct": missing_pct,
+            }
+        )
+
+    algorithms = get_available_algorithms(problem_type)
+
+    return {
+        "algorithms": algorithms,
+        "features": feature_info,
+        "target_column": target_column,
+        "problem_type": problem_type,
+        "total_features": len(feature_info),
+    }
 
 
 @router.get("/train-status/{job_id}")

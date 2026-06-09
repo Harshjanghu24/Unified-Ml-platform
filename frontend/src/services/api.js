@@ -29,9 +29,10 @@ export const selectTarget = (targetColumn) => {
 export const getDatasetSummary = () => api.get('/dataset-summary');
 
 // ── Training APIs ──
-export const trainModels = () => api.post('/train');
+export const trainModels = (params = {}) => api.post('/train', params);
 export const getTrainStatus = (jobId) => api.get(`/train-status/${jobId}`);
 export const getTrainResult = (jobId) => api.get(`/train-result/${jobId}`);
+export const getTrainingOptions = () => api.get('/training-options');
 export const getSystemInfo = () => api.get('/system-info');
 
 export const getMetrics = () => api.get('/metrics');

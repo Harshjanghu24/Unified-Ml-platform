@@ -30,6 +30,7 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 try:
@@ -141,6 +142,111 @@ PARAM_GRIDS = {
         "learning_rate": [0.01, 0.1, 0.3],
     },
 }
+
+# ── User-friendly algorithm name → (model_class, internal_name) mapping ──
+# Maps display names from the frontend dropdown to scikit-learn model classes.
+# Each problem type has its own set of valid algorithms.
+ALGORITHM_MAP = {
+    "binary": {
+        "Logistic Regression": (LogisticRegression, "LogisticRegression"),
+        "Decision Tree": (DecisionTreeClassifier, "DecisionTreeClassifier"),
+        "Random Forest": (RandomForestClassifier, "RandomForestClassifier"),
+        "SVM": (SVC, "SVC"),
+        "KNN": (KNeighborsClassifier, "KNeighborsClassifier"),
+    },
+    "multiclass": {
+        "Logistic Regression": (LogisticRegression, "LogisticRegression"),
+        "Decision Tree": (DecisionTreeClassifier, "DecisionTreeClassifier"),
+        "Random Forest": (RandomForestClassifier, "RandomForestClassifier"),
+        "SVM": (SVC, "SVC"),
+        "KNN": (KNeighborsClassifier, "KNeighborsClassifier"),
+    },
+    "regression": {
+        "Linear Regression": (LinearRegression, "LinearRegression"),
+        "Random Forest": (RandomForestRegressor, "RandomForestRegressor"),
+    },
+}
+
+# Add XGBoost entries if available
+if HAS_XGBOOST:
+    from xgboost import XGBClassifier as _XGBCls, XGBRegressor as _XGBReg
+
+    ALGORITHM_MAP["binary"]["XGBoost"] = (_XGBCls, "XGBClassifier")
+    ALGORITHM_MAP["multiclass"]["XGBoost"] = (_XGBCls, "XGBClassifier")
+    ALGORITHM_MAP["regression"]["XGBoost"] = (_XGBReg, "XGBRegressor")
+
+# SVM needs probability=True for ROC-AUC and uses its own param grid
+PARAM_GRIDS["SVC"] = {
+    "C": [0.1, 1, 10],
+    "kernel": ["rbf", "linear"],
+}
+
+
+def get_available_algorithms(problem_type: str) -> list[str]:
+    """Return the list of algorithm display names available for a problem type."""
+    return list(ALGORITHM_MAP.get(problem_type, {}).keys())
+
+
+def train_single_model(X_train, X_test, y_train, y_test, problem_type, algorithm_name):
+    """
+    Train a single user-selected algorithm.
+
+    Args:
+        algorithm_name: User-friendly name (e.g. "Random Forest", "XGBoost")
+
+    Returns:
+        List with one dict (same schema as train_models) for consistency.
+    """
+    algo_map = ALGORITHM_MAP.get(problem_type, {})
+    if algorithm_name not in algo_map:
+        available = list(algo_map.keys())
+        raise ValueError(
+            f"Algorithm '{algorithm_name}' is not available for problem type '{problem_type}'. "
+            f"Available: {available}"
+        )
+
+    model_class, internal_name = algo_map[algorithm_name]
+    logger.info(f"Training single model: {algorithm_name} ({internal_name}) for {problem_type}")
+
+    n_classes = int(y_train.nunique()) if problem_type != "regression" else 0
+    repro_metadata = _get_reproducibility_metadata()
+
+    start_time = time.time()
+
+    # SVM special handling: enable probability estimates for ROC-AUC
+    extra_init_kwargs = {}
+    if internal_name == "SVC":
+        extra_init_kwargs["probability"] = True
+
+    model, best_params, best_search_score = _tune_and_train(
+        model_class, internal_name, X_train, y_train, problem_type
+    )
+
+    training_time = round(time.time() - start_time, 3)
+
+    if problem_type in ("binary", "multiclass"):
+        metrics = _evaluate_classifier(model, X_test, y_test, n_classes)
+    else:
+        metrics = _evaluate_regressor(model, X_test, y_test)
+
+    cv_scores = _cross_validate(model, X_train, y_train, problem_type, cv=5)
+    _log_to_mlflow(internal_name, model, best_params, metrics, problem_type)
+
+    result = {
+        "model_name": internal_name,
+        "display_name": algorithm_name,
+        "model_object": model,
+        "metrics": metrics,
+        "training_time": training_time,
+        "best_params": best_params,
+        "best_search_score": best_search_score,
+        "cv_scores": cv_scores,
+        "is_best": True,  # Only one model, so it's the best by default
+        "reproducibility_metadata": repro_metadata,
+    }
+
+    logger.info(f"Completed training {algorithm_name} in {training_time}s")
+    return [result]
 
 
 def _evaluate_classifier(model, X_test, y_test, n_classes):
@@ -255,6 +361,11 @@ def _tune_and_train(model_class, model_name, X_train, y_train, problem_type):
     if problem_type in ("binary", "multiclass"):
         if model_name in ("LogisticRegression", "RandomForestClassifier", "DecisionTreeClassifier"):
             extra_kwargs["class_weight"] = "balanced"
+
+    # SVM special handling: enable probability estimates for ROC-AUC
+    if model_name == "SVC":
+        extra_kwargs["probability"] = True
+        extra_kwargs["class_weight"] = "balanced"
 
     if "XGB" in model_name:
         extra_kwargs = {
