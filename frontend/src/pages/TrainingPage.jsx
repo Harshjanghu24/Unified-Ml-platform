@@ -340,7 +340,7 @@ export default function TrainingPage() {
 
             {filteredFeatures.length === 0 && featureSearch && (
               <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px', fontSize: '0.9rem' }}>
-                No features match "{featureSearch}"
+                No features match &quot;{featureSearch}&quot;
               </p>
             )}
           </div>

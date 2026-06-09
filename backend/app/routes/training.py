@@ -69,9 +69,9 @@ def _run_training_pipeline_task(
             # Keep only the selected features plus the target column
             cols_to_keep = selected_features + [target_column]
             df = df[cols_to_keep]
-            _jobs[job_id]["progress"] = (
-                f"Filtering to {len(selected_features)} user-selected features..."
-            )
+            _jobs[job_id][
+                "progress"
+            ] = f"Filtering to {len(selected_features)} user-selected features..."
 
         _jobs[job_id]["progress"] = "Step 1: Preprocessing data..."
         prep_result = build_preprocessing_pipeline(df, target_column, problem_type)

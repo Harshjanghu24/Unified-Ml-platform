@@ -125,7 +125,8 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
         # but better to let it fail or handle it at training.
         # For now, we'll raise an informative error if we hit this.
         raise ValueError(
-            "No features remaining after preprocessing. All columns were either dropped as high-cardinality/IDs or were empty."
+            "No features remaining after preprocessing. "
+            "All columns were either dropped as high-cardinality/IDs or were empty."
         )
 
     scaler = StandardScaler()
