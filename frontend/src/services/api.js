@@ -2,16 +2,19 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 300000, // 5 min timeout for training
+  timeout: 1_800_000, // 30 min timeout for large uploads & training
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 // ── Dataset APIs ──
-export const uploadDataset = (formData) =>
+export const uploadDataset = (formData, onUploadProgress) =>
   api.post('/upload-dataset', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    // Support upload progress tracking for large files
+    onUploadProgress,
+    // No timeout override — the global 30 min is sufficient for 10 GB
   });
 
 export const analyzeColumns = () => api.post('/analyze-columns');
@@ -27,6 +30,12 @@ export const selectTarget = (targetColumn) => {
 };
 
 export const getDatasetSummary = () => api.get('/dataset-summary');
+
+// ── Preprocessing APIs ──
+export const preprocessAuto = () => api.post('/preprocess/auto');
+export const preprocessManual = (config) => api.post('/preprocess/manual', config);
+export const getPreprocessingReport = () => api.get('/preprocess/report');
+export const getEncodingRecommendations = () => api.get('/preprocess/recommendations');
 
 // ── Training APIs ──
 export const trainModels = (params = {}) => api.post('/train', params);

@@ -10,6 +10,7 @@ export default function DatasetPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileRef = useRef(null);
   const navigate = useNavigate();
 
@@ -20,11 +21,15 @@ export default function DatasetPage() {
     }
 
     setLoading(true);
+    setUploadProgress(0);
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      const { data } = await uploadDataset(formData);
+      const { data } = await uploadDataset(formData, (progressEvent) => {
+        const pct = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+        setUploadProgress(pct);
+      });
       setResult(data);
       toast.success('Dataset uploaded! Now analyze columns to find the best target.');
     } catch (err) {
@@ -88,7 +93,10 @@ export default function DatasetPage() {
           <div>
             <p style={{ fontWeight: 600, fontSize: '1.1rem' }}>{file.name}</p>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              {(file.size / 1024).toFixed(1)} KB — Click or drop to replace
+              {file.size > 1024 * 1024
+                ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+                : `${(file.size / 1024).toFixed(1)} KB`
+              } — Click or drop to replace
             </p>
           </div>
         ) : (
@@ -125,7 +133,7 @@ export default function DatasetPage() {
             {loading ? (
               <>
                 <span className="spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                Processing...
+                {uploadProgress < 100 ? `Uploading ${uploadProgress}%...` : 'Processing...'}
               </>
             ) : (
               <>
@@ -134,6 +142,24 @@ export default function DatasetPage() {
             )}
           </button>
         </div>
+        {/* Upload progress bar */}
+        {loading && uploadProgress > 0 && uploadProgress < 100 && (
+          <div style={{ marginTop: '16px' }}>
+            <div style={{
+              height: '6px', borderRadius: '3px',
+              background: 'var(--bg-primary)', overflow: 'hidden',
+            }}>
+              <div style={{
+                height: '100%', width: `${uploadProgress}%`,
+                background: 'var(--gradient-accent)',
+                borderRadius: '3px', transition: 'width 0.3s ease',
+              }} />
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+              {uploadProgress}% uploaded
+            </p>
+          </div>
+        )}
       </motion.div>
 
       {/* Results */}
@@ -164,6 +190,61 @@ export default function DatasetPage() {
               <div className="stat-label">Numeric Cols</div>
             </div>
           </div>
+
+          {/* Dataset Stats (Tier info) */}
+          {result.dataset_stats && (
+            <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
+              <h4 style={{ fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ⚡ Processing Details
+                <span style={{
+                  padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700,
+                  background: result.dataset_stats.tier === 1 ? 'rgba(16,185,129,0.15)'
+                    : result.dataset_stats.tier === 2 ? 'rgba(99,102,241,0.15)'
+                    : 'rgba(245,158,11,0.15)',
+                  color: result.dataset_stats.tier === 1 ? 'var(--accent-emerald)'
+                    : result.dataset_stats.tier === 2 ? 'var(--accent-indigo)'
+                    : 'var(--accent-amber)',
+                }}>
+                  Tier {result.dataset_stats.tier}
+                </span>
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', fontSize: '0.85rem' }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>File Size</span>
+                  <div style={{ fontWeight: 600 }}>
+                    {result.dataset_stats.file_size_mb > 1024
+                      ? `${(result.dataset_stats.file_size_mb / 1024).toFixed(1)} GB`
+                      : `${result.dataset_stats.file_size_mb} MB`
+                    }
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Memory Usage</span>
+                  <div style={{ fontWeight: 600 }}>{result.dataset_stats.memory_after_mb} MB</div>
+                </div>
+                {result.dataset_stats.memory_savings_pct > 0 && (
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Memory Saved</span>
+                    <div style={{ fontWeight: 600, color: 'var(--accent-emerald)' }}>
+                      {result.dataset_stats.memory_savings_pct}%
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Load Time</span>
+                  <div style={{ fontWeight: 600 }}>{result.dataset_stats.processing_time_seconds}s</div>
+                </div>
+                {result.dataset_stats.sampling_applied && (
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Sampling</span>
+                    <div style={{ fontWeight: 600, color: 'var(--accent-amber)' }}>
+                      {result.dataset_stats.total_rows_in_file?.toLocaleString()} → {result.dataset_stats.rows_loaded?.toLocaleString()} rows
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Column Info */}
           <div className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>

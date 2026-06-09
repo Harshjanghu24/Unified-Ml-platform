@@ -11,6 +11,7 @@ import EvaluationPage from './pages/EvaluationPage.jsx';
 import ExplainabilityPage from './pages/ExplainabilityPage.jsx';
 import PredictionPage from './pages/PredictionPage.jsx';
 import SavedModelsPage from './pages/SavedModelsPage.jsx';
+import PreprocessingPage from './pages/PreprocessingPage.jsx';
 
 export default function App() {
   const [collapsed, setCollapsed] = useState(false);
@@ -57,6 +58,7 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/dataset" element={<DatasetPage />} />
             <Route path="/analyzer" element={<AnalyzerPage />} />
+            <Route path="/preprocessing" element={<PreprocessingPage />} />
             <Route path="/eda" element={<EDAPage />} />
             <Route path="/training" element={<TrainingPage />} />
             <Route path="/evaluation" element={<EvaluationPage />} />

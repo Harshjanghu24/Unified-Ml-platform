@@ -1,15 +1,18 @@
-# """
-# Dataset API Routes.
-# Handles CSV upload, dataset analysis, target recommendations, and target selection.
+"""
+Dataset API Routes — Large Dataset Support.
 
-# Workflow:
-#   1. POST /upload-dataset     → Upload CSV (no target column needed)
-#   2. POST /analyze-columns    → Analyze all columns for target suitability
-#   3. GET  /target-recommendations → Get ranked target recommendations
-#   4. POST /select-target      → User selects a target column
-# """
+Handles CSV upload (streaming to disk), dataset analysis, target
+recommendations, and target selection.
+
+Workflow:
+  1. POST /upload-dataset     → Stream CSV to disk, load with tiered loader
+  2. POST /analyze-columns    → Analyze all columns for target suitability
+  3. GET  /target-recommendations → Get ranked target recommendations
+  4. POST /select-target      → User selects a target column
+"""
 
 import os
+import time
 
 import pandas as pd
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -17,7 +20,15 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from ..database import get_latest_dataset, save_dataset_record
 from ..logger import setup_logger
 from ..ml.analyzer import analyze_all_columns, get_target_recommendations
-from ..ml.csv_loader import CSVLoadResult, load_csv
+from ..ml.csv_loader import (
+    CSVLoadResult,
+    TIER1_MAX_MB,
+    TIER2_MAX_MB,
+    TIER3_MAX_MB,
+    get_dataset_stats,
+    load_csv,
+    optimize_memory,
+)
 from ..ml.detector import detect_problem_type, get_target_info
 
 logger = setup_logger(__name__)
@@ -29,6 +40,9 @@ _current_dataset = {}
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Streaming upload chunk size: 8 MB for efficient disk writes on large files
+_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
 
 
 def _raise_for_csv_result(result: CSVLoadResult):
@@ -49,7 +63,7 @@ def _build_summary(df: pd.DataFrame, target_info: dict = None) -> dict:
         "dtypes": dtypes,
         "missing_values": missing_values,
         "total_missing": int(df.isnull().sum().sum()),
-        "numeric_columns": df.select_dtypes(include=["int64", "float64"]).columns.tolist(),
+        "numeric_columns": df.select_dtypes(include=["int64", "int32", "int16", "int8", "float64", "float32"]).columns.tolist(),
         "categorical_columns": df.select_dtypes(include=["object", "category"]).columns.tolist(),
     }
     if target_info:
@@ -74,6 +88,7 @@ def get_current_dataset():
                         _current_dataset["target_column"] = record.get("target_column")
                         _current_dataset["problem_type"] = record.get("problem_type")
                         _current_dataset["dataset_id"] = record.get("id")
+                        _current_dataset["dataset_stats"] = get_dataset_stats(result)
                     else:
                         logger.warning(f"Auto-restore failed: {result.error}")
                 except Exception as e:
@@ -86,32 +101,65 @@ async def upload_dataset(file: UploadFile = File(...)):
     """
     Step 1: Upload a CSV dataset WITHOUT specifying a target column.
 
-    - Saves the file to disk streaming in chunks to prevent high memory usage
-    - Reads it with the production CSV loader (auto-detects encoding & delimiter)
-    - Computes basic summary statistics
-    - Stores in memory for subsequent analysis
+    For ALL file sizes the upload is streamed to disk in chunks to
+    prevent the server from buffering the entire request body in RAM.
+    After saving, the tiered CSV loader reads the file with appropriate
+    strategy based on file size.
     """
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported.")
 
-    # Save file in chunks to prevent high memory usage
+    # ── Stream upload to disk ────────────────────────────────
     filepath = os.path.join(UPLOAD_DIR, file.filename)
+    upload_start = time.time()
+    bytes_written = 0
+
     try:
         with open(filepath, "wb") as f:
-            while chunk := await file.read(1024 * 1024):  # 1MB chunks
+            while chunk := await file.read(_UPLOAD_CHUNK_SIZE):
                 f.write(chunk)
+                bytes_written += len(chunk)
     except Exception as e:
+        # Cleanup partial file on failure
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+            except OSError:
+                pass
         raise HTTPException(status_code=500, detail=f"Error saving uploaded file: {str(e)}") from e
 
-    # ── Load with production CSV loader ──────────────────────
+    upload_duration = round(time.time() - upload_start, 2)
+    file_size_mb = round(bytes_written / (1024 * 1024), 2)
+
+    logger.info(
+        f"Upload complete: {file.filename} — {file_size_mb:,.1f} MB "
+        f"streamed to disk in {upload_duration}s"
+    )
+
+    # ── Pre-flight size check ────────────────────────────────
+    if file_size_mb > TIER3_MAX_MB:
+        # Clean up — file is too large
+        os.remove(filepath)
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"File is too large ({file_size_mb:,.1f} MB / {file_size_mb / 1024:.1f} GB). "
+                f"Maximum allowed size is {TIER3_MAX_MB / 1024:.0f} GB."
+            ),
+        )
+
+    # ── Load with tiered CSV loader ──────────────────────────
+    # At upload time we don't know the target column or selected features yet,
+    # so we load ALL columns.  For very large files (Tier 3), a re-load with
+    # feature-aware usecols will happen at training time.
     result = load_csv(filepath)
     _raise_for_csv_result(result)
     df = result.df
 
     logger.info(
-        f"Dataset uploaded: {file.filename} — "
+        f"Dataset loaded (Tier {result.tier}): {file.filename} — "
         f"{result.row_count:,} rows × {result.col_count} cols, "
-        f"{result.memory_usage_mb} MB, "
+        f"{result.memory_usage_mb} MB in-memory, "
         f"encoding={result.detected_encoding}, "
         f"delimiter={repr(result.detected_delimiter)}"
     )
@@ -128,17 +176,31 @@ async def upload_dataset(file: UploadFile = File(...)):
     _current_dataset["target_column"] = None
     _current_dataset["problem_type"] = None
     _current_dataset["dataset_id"] = None
+    _current_dataset["dataset_stats"] = get_dataset_stats(result)
 
     response = {
         "message": "Dataset uploaded successfully. Now analyze columns to find the best target.",
         "filename": file.filename,
         "summary": summary,
         "preview": preview,
+        "dataset_stats": _current_dataset["dataset_stats"],
     }
 
     # Surface loader warnings to the frontend
     if result.warnings:
         response["warnings"] = result.warnings
+
+    # Tier-specific messages
+    if result.tier >= 2:
+        response["message"] += (
+            f" (Tier {result.tier}: memory-optimised loading applied, "
+            f"{result.memory_savings_pct}% memory reduction)"
+        )
+    if result.sampling_applied:
+        response["message"] += (
+            f" Dataset sampled from {result.total_rows_in_file:,} to "
+            f"{result.row_count:,} rows for training."
+        )
 
     return response
 
@@ -279,6 +341,7 @@ async def get_dataset_summary():
         "dataset_id": _current_dataset.get("dataset_id"),
         "has_target": target_column is not None,
         "target_column": target_column,
+        "dataset_stats": _current_dataset.get("dataset_stats"),
     }
 
 

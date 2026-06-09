@@ -47,6 +47,8 @@ async def predict(input_data: PredictionInput):
     scaler = pipeline["scaler"]
     label_encoder = pipeline["label_encoder"]
     problem_type = pipeline["problem_type"]
+    categorical_encoders = pipeline.get("categorical_encoders")
+    encoding_method = pipeline.get("encoding_method", "onehot")
 
     # Find best model
     dataset_id = training_state["dataset_id"]
@@ -60,7 +62,14 @@ async def predict(input_data: PredictionInput):
 
     # Preprocess input
     try:
-        processed = preprocess_for_prediction(input_data.features, feature_names, scaler)
+        processed = preprocess_for_prediction(
+            input_data.features,
+            feature_names,
+            scaler,
+            label_encoder=label_encoder,
+            categorical_encoders=categorical_encoders,
+            encoding_method=encoding_method
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Preprocessing error: {str(e)}") from e
 
@@ -143,6 +152,8 @@ async def predict_batch(file: UploadFile = File(...)):
     scaler = pipeline["scaler"]
     label_encoder = pipeline["label_encoder"]
     problem_type = pipeline["problem_type"]
+    categorical_encoders = pipeline.get("categorical_encoders")
+    encoding_method = pipeline.get("encoding_method", "onehot")
 
     # Load best model
     dataset_id = training_state["dataset_id"]
@@ -154,7 +165,14 @@ async def predict_batch(file: UploadFile = File(...)):
     results = []
     for idx, row in df.iterrows():
         try:
-            processed = preprocess_for_prediction(row.to_dict(), feature_names, scaler)
+            processed = preprocess_for_prediction(
+                row.to_dict(),
+                feature_names,
+                scaler,
+                label_encoder=label_encoder,
+                categorical_encoders=categorical_encoders,
+                encoding_method=encoding_method
+            )
             prediction = model.predict(processed)
 
             if problem_type in ("binary", "multiclass"):

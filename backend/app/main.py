@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
 from .logger import setup_logger
-from .routes import dataset, models, prediction, training
+from .routes import dataset, models, prediction, training, preprocessing
 
 logger = setup_logger(__name__)
 
@@ -51,6 +51,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(dataset.router)
+app.include_router(preprocessing.router)
 app.include_router(training.router)
 app.include_router(prediction.router)
 app.include_router(models.router)

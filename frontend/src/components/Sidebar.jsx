@@ -2,16 +2,17 @@ import { NavLink } from 'react-router-dom';
 import {
   HiHome, HiDatabase, HiChartBar, HiDocumentReport,
   HiCursorClick, HiSave, HiSun, HiMoon, HiChevronLeft, HiChevronRight,
-  HiBeaker, HiSearchCircle, HiLightBulb
+  HiBeaker, HiSearchCircle, HiLightBulb, HiCog
 } from 'react-icons/hi';
 
 const navItems = [
   { path: '/', icon: HiHome, label: 'Home' },
-  { path: '/dataset', icon: HiDatabase, label: 'Dataset Upload' },
+  { path: '/dataset', icon: HiDatabase, label: 'Dataset' },
   { path: '/analyzer', icon: HiSearchCircle, label: 'Dataset Analyzer' },
+  { path: '/preprocessing', icon: HiCog, label: 'Preprocessing' },
   { path: '/eda', icon: HiChartBar, label: 'EDA Dashboard' },
   { path: '/training', icon: HiBeaker, label: 'Training' },
-  { path: '/evaluation', icon: HiDocumentReport, label: 'Evaluation' },
+  { path: '/evaluation', icon: HiDocumentReport, label: 'Results' },
   { path: '/explainability', icon: HiLightBulb, label: 'Explainability' },
   { path: '/prediction', icon: HiCursorClick, label: 'Prediction' },
   { path: '/models', icon: HiSave, label: 'Saved Models' },

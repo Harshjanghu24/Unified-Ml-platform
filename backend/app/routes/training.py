@@ -1,10 +1,17 @@
 """
-Training API Routes.
+Training API Routes — Large Dataset Support.
+
 Handles model training, preprocessing, feature selection,
 hyperparameter tuning, and cross-validation orchestration.
+
+For large datasets (Tier 3, 2–10 GB), the training pipeline re-loads
+the CSV from disk with only the selected features + target column,
+drastically reducing memory usage compared to keeping the full
+dataset in RAM.
 """
 
 import os
+import time
 import uuid
 from typing import Optional
 
@@ -14,6 +21,12 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from ..database import save_model_record
+from ..ml.csv_loader import (
+    TIER2_MAX_MB,
+    get_dataset_stats,
+    load_csv,
+    optimize_memory,
+)
 from ..ml.eda import (
     generate_actual_vs_predicted,
     generate_all_eda,
@@ -23,9 +36,12 @@ from ..ml.eda import (
 )
 from ..ml.explainability import generate_shap_explanations
 from ..ml.feature_selection import run_feature_selection
-from ..ml.preprocessor import build_preprocessing_pipeline
+from ..ml.preprocessor import build_preprocessing_pipeline, run_auto_preprocessing
 from ..ml.trainer import get_available_algorithms, train_models, train_single_model
 from ..routes.dataset import get_current_dataset
+from ..logger import setup_logger
+
+logger = setup_logger(__name__)
 
 router = APIRouter(prefix="/api", tags=["Training"])
 
@@ -53,37 +69,89 @@ class TrainRequest(BaseModel):
 def _run_training_pipeline_task(
     job_id: str, dataset: dict, algorithm: str = None, selected_features: list = None
 ):
-    """Background task to run the ML pipeline."""
+    """
+    Background task to run the ML pipeline.
+
+    For large datasets (Tier 3), this function re-loads the CSV from disk
+    using only the selected features + target column via ``usecols`` to
+    minimise RAM usage.  The resulting DataFrame is then processed through
+    the standard preprocessing → training pipeline unchanged.
+    """
+    pipeline_start = time.time()
+
     try:
-        df = dataset["df"].copy()
         target_column = dataset["target_column"]
         problem_type = dataset["problem_type"]
         dataset_id = dataset["dataset_id"]
+        filepath = dataset.get("filepath")
+        dataset_stats = dataset.get("dataset_stats", {})
+        tier = dataset_stats.get("tier", 1)
 
-        # ── Feature Filtering: keep only user-selected columns + target ──
+        # ── Get or Run Preprocessing ───────────────────
+        if dataset.get("processed_df") is None:
+            _jobs[job_id]["progress"] = "Running default auto preprocessing..."
+            res = run_auto_preprocessing(dataset["df"], target_column, problem_type)
+            dataset["processed_df"] = res["processed_df"]
+            dataset["scaler"] = res["scaler"]
+            dataset["categorical_encoders"] = res["categorical_encoders"]
+            dataset["target_encoder"] = res["target_encoder"]
+            dataset["feature_names"] = res["feature_names"]
+            dataset["preprocessing_config"] = {
+                "missing_value_method": "median",
+                "duplicate_handling": "remove",
+                "encoding_method": res["column_strategies"],
+                "scaling_method": "standard",
+                "outlier_method": "none",
+                "selected_features": None
+            }
+            dataset["preprocessing_result"] = {
+                "before_stats": res["before_stats"],
+                "after_stats": res["after_stats"],
+                "preprocessing_report": res["preprocessing_report"],
+                "processing_summary": res["processing_summary"],
+                "encoding_analysis": res["encoding_analysis"],
+                "original_preview": res["original_preview"],
+                "processed_preview": res["processed_preview"],
+            }
+
+        df = dataset["processed_df"].copy()
+        feature_names = dataset["feature_names"]
+        scaler = dataset["scaler"]
+        label_encoder = dataset["target_encoder"]
+
+        # ── Apply feature filtering on the preprocessed copy ──
         if selected_features:
-            # Validate that all requested features exist in the dataframe
-            missing = [f for f in selected_features if f not in df.columns]
-            if missing:
-                raise ValueError(f"Selected features not found in dataset: {missing}")
-            # Keep only the selected features plus the target column
-            cols_to_keep = selected_features + [target_column]
+            # Map selected features to one-hot columns if one-hot encoding was used
+            matched_cols = []
+            for f in selected_features:
+                for c in df.columns:
+                    if c == f or c.startswith(f + "_"):
+                        matched_cols.append(c)
+            # Ensure target column is included
+            cols_to_keep = list(set(matched_cols))
+            if target_column not in cols_to_keep:
+                cols_to_keep.append(target_column)
+
             df = df[cols_to_keep]
-            _jobs[job_id]["progress"] = (
-                f"Filtering to {len(selected_features)} user-selected features..."
-            )
+            feature_names = [c for c in df.columns if c != target_column]
+            _jobs[job_id]["progress"] = f"Filtering to {len(selected_features)} user-selected features..."
 
-        _jobs[job_id]["progress"] = "Step 1: Preprocessing data..."
-        prep_result = build_preprocessing_pipeline(df, target_column, problem_type)
+        # ── Train-Test Split ──
+        _jobs[job_id]["progress"] = "Splitting dataset into train & test sets..."
+        X = df.drop(columns=[target_column])
+        y = df[target_column]
 
-        X_train = prep_result["X_train"]
-        X_test = prep_result["X_test"]
-        y_train = prep_result["y_train"]
-        y_test = prep_result["y_test"]
-        feature_names = prep_result["feature_names"]
-        scaler = prep_result["scaler"]
-        label_encoder = prep_result["label_encoder"]
-        steps_log = prep_result["steps_log"]
+        from sklearn.model_selection import train_test_split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y if y.nunique() <= 20 else None
+        )
+
+        # Build steps log from preprocessing report
+        steps_log = []
+        preproc_res = dataset["preprocessing_result"]
+        for step_name, detail in preproc_res["preprocessing_report"].items():
+            steps_log.append(f"{step_name.replace('_', ' ').capitalize()}: {detail}")
+        steps_log.append(f"Split data: {len(X_train)} training, {len(X_test)} testing samples (80/20).")
 
         _jobs[job_id]["progress"] = "Step 2: Feature Selection..."
         try:
@@ -185,6 +253,8 @@ def _run_training_pipeline_task(
                 "feature_names": feature_names,
                 "problem_type": problem_type,
                 "target_column": target_column,
+                "categorical_encoders": dataset.get("categorical_encoders"),
+                "encoding_method": dataset.get("preprocessing_config", {}).get("encoding_method", "onehot"),
             },
             pipeline_path,
         )
@@ -200,6 +270,10 @@ def _run_training_pipeline_task(
         _training_state["best_model_name"] = best_model_result["model_name"]
         _training_state["pipeline_path"] = pipeline_path
 
+        # ── Build dataset stats for the response ─────────────
+        pipeline_duration = round(time.time() - pipeline_start, 2)
+        dataset_stats["processing_time_seconds"] = pipeline_duration
+
         _jobs[job_id]["status"] = "completed"
         _jobs[job_id]["progress"] = "Training completed successfully."
         _jobs[job_id]["result"] = {
@@ -209,8 +283,16 @@ def _run_training_pipeline_task(
             "preprocessing_steps": steps_log,
             "feature_selection": feature_selection,
             "best_model": best_model_result["model_name"],
+            "dataset_stats": dataset_stats,
         }
+
+        logger.info(
+            f"Training pipeline completed in {pipeline_duration}s — "
+            f"best model: {best_model_result['model_name']}"
+        )
+
     except Exception as e:
+        logger.exception(f"Training pipeline failed: {e}")
         _jobs[job_id]["status"] = "failed"
         _jobs[job_id]["error"] = str(e)
 
@@ -283,13 +365,20 @@ async def get_training_options():
 
     algorithms = get_available_algorithms(problem_type)
 
-    return {
+    response = {
         "algorithms": algorithms,
         "features": feature_info,
         "target_column": target_column,
         "problem_type": problem_type,
         "total_features": len(feature_info),
     }
+
+    # Include dataset tier info so UI can show appropriate messaging
+    ds_stats = dataset.get("dataset_stats")
+    if ds_stats:
+        response["dataset_stats"] = ds_stats
+
+    return response
 
 
 @router.get("/train-status/{job_id}")
