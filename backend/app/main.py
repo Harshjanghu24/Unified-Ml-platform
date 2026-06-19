@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
 from .logger import setup_logger
-from .routes import dataset, models, prediction, training, preprocessing
+from .routes import dataset, models, prediction, preprocessing, training
 
 logger = setup_logger(__name__)
 

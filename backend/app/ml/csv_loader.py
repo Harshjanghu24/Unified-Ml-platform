@@ -27,7 +27,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 
 from ..logger import setup_logger
@@ -312,10 +311,7 @@ def _load_tier1(filepath: str, kwargs: dict, result: CSVLoadResult) -> pd.DataFr
 # ══════════════════════════════════════════════════════════════
 def _load_tier2(filepath: str, kwargs: dict, result: CSVLoadResult) -> pd.DataFrame:
     """Chunked reading with per-chunk memory optimisation."""
-    logger.info(
-        f"Tier 2 — chunked ingestion ({CHUNK_ROWS:,} rows/chunk) "
-        "with memory optimisation"
-    )
+    logger.info(f"Tier 2 — chunked ingestion ({CHUNK_ROWS:,} rows/chunk) with memory optimisation")
     chunks: list[pd.DataFrame] = []
     total_rows = 0
 
@@ -365,10 +361,12 @@ def _load_tier3(
     """
     if usecols:
         kwargs["usecols"] = usecols
-        logger.info(
-            f"Tier 3 — feature-aware loading: {len(usecols)} of "
-            f"{_count_total_columns(filepath, kwargs.get('encoding', 'utf-8'), kwargs.get('sep', ','))} columns"
+        total_cols = _count_total_columns(
+            filepath,
+            kwargs.get("encoding", "utf-8"),
+            kwargs.get("sep", ","),
         )
+        logger.info(f"Tier 3 — feature-aware loading: {len(usecols)} of {total_cols} columns")
     else:
         logger.info("Tier 3 — chunked ingestion (no column filter)")
 
@@ -452,9 +450,7 @@ def load_csv(
     result.file_size_mb = round(file_size / (1024 * 1024), 2)
     tier = _determine_tier(result.file_size_mb)
     result.tier = tier
-    logger.info(
-        f"CSV load started — {filepath} ({result.file_size_mb:,.1f} MB, Tier {tier})"
-    )
+    logger.info(f"CSV load started — {filepath} ({result.file_size_mb:,.1f} MB, Tier {tier})")
 
     # ── 2. Sniff encoding + delimiter ────────────────────────
     try:
@@ -562,9 +558,7 @@ def load_csv(
     result.success = True
     result.row_count = len(df)
     result.col_count = df.shape[1]
-    result.memory_usage_mb = round(
-        df.memory_usage(deep=True).sum() / (1024 * 1024), 2
-    )
+    result.memory_usage_mb = round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2)
     result.processing_time_seconds = round(time.time() - start_time, 2)
     if usecols:
         result.columns_loaded = len(usecols)

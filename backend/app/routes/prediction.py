@@ -68,7 +68,7 @@ async def predict(input_data: PredictionInput):
             scaler,
             label_encoder=label_encoder,
             categorical_encoders=categorical_encoders,
-            encoding_method=encoding_method
+            encoding_method=encoding_method,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Preprocessing error: {str(e)}") from e
@@ -171,7 +171,7 @@ async def predict_batch(file: UploadFile = File(...)):
                 scaler,
                 label_encoder=label_encoder,
                 categorical_encoders=categorical_encoders,
-                encoding_method=encoding_method
+                encoding_method=encoding_method,
             )
             prediction = model.predict(processed)
 

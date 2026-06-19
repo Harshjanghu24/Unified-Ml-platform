@@ -21,12 +21,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from ..database import save_model_record
-from ..ml.csv_loader import (
-    TIER2_MAX_MB,
-    get_dataset_stats,
-    load_csv,
-    optimize_memory,
-)
+from ..logger import setup_logger
 from ..ml.eda import (
     generate_actual_vs_predicted,
     generate_all_eda,
@@ -36,10 +31,13 @@ from ..ml.eda import (
 )
 from ..ml.explainability import generate_shap_explanations
 from ..ml.feature_selection import run_feature_selection
-from ..ml.preprocessor import build_preprocessing_pipeline, run_auto_preprocessing
-from ..ml.trainer import get_available_algorithms, train_models, train_single_model
+from ..ml.preprocessor import run_auto_preprocessing
+from ..ml.trainer import (
+    get_available_algorithms,
+    train_models,
+    train_single_model,
+)
 from ..routes.dataset import get_current_dataset
-from ..logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -83,9 +81,7 @@ def _run_training_pipeline_task(
         target_column = dataset["target_column"]
         problem_type = dataset["problem_type"]
         dataset_id = dataset["dataset_id"]
-        filepath = dataset.get("filepath")
         dataset_stats = dataset.get("dataset_stats", {})
-        tier = dataset_stats.get("tier", 1)
 
         # ── Get or Run Preprocessing ───────────────────
         if dataset.get("processed_df") is None:
@@ -102,7 +98,7 @@ def _run_training_pipeline_task(
                 "encoding_method": res["column_strategies"],
                 "scaling_method": "standard",
                 "outlier_method": "none",
-                "selected_features": None
+                "selected_features": None,
             }
             dataset["preprocessing_result"] = {
                 "before_stats": res["before_stats"],
@@ -133,9 +129,9 @@ def _run_training_pipeline_task(
                 cols_to_keep.append(target_column)
             df = df[cols_to_keep]
             feature_names = [c for c in df.columns if c != target_column]
-            _jobs[job_id][
-                "progress"
-            ] = f"Filtering to {len(selected_features)} user-selected features..."
+            _jobs[job_id]["progress"] = (
+                f"Filtering to {len(selected_features)} user-selected features..."
+            )
 
         # ── Train-Test Split ──
         _jobs[job_id]["progress"] = "Splitting dataset into train & test sets..."
@@ -143,6 +139,7 @@ def _run_training_pipeline_task(
         y = df[target_column]
 
         from sklearn.model_selection import train_test_split
+
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42, stratify=y if y.nunique() <= 20 else None
         )
@@ -152,7 +149,9 @@ def _run_training_pipeline_task(
         preproc_res = dataset["preprocessing_result"]
         for step_name, detail in preproc_res["preprocessing_report"].items():
             steps_log.append(f"{step_name.replace('_', ' ').capitalize()}: {detail}")
-        steps_log.append(f"Split data: {len(X_train)} training, {len(X_test)} testing samples (80/20).")
+        steps_log.append(
+            f"Split data: {len(X_train)} training, {len(X_test)} testing samples (80/20)."
+        )
 
         _jobs[job_id]["progress"] = "Step 2: Feature Selection..."
         try:
@@ -255,7 +254,9 @@ def _run_training_pipeline_task(
                 "problem_type": problem_type,
                 "target_column": target_column,
                 "categorical_encoders": dataset.get("categorical_encoders"),
-                "encoding_method": dataset.get("preprocessing_config", {}).get("encoding_method", "onehot"),
+                "encoding_method": dataset.get("preprocessing_config", {}).get(
+                    "encoding_method", "onehot"
+                ),
             },
             pipeline_path,
         )

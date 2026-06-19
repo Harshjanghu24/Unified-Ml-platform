@@ -436,7 +436,9 @@ def _tune_and_train(model_class, model_name, X_train, y_train, problem_type):
         k: (
             int(v)
             if isinstance(v, (np.integer,))
-            else float(v) if isinstance(v, (np.floating,)) else v
+            else float(v)
+            if isinstance(v, (np.floating,))
+            else v
         )
         for k, v in search.best_params_.items()
     }

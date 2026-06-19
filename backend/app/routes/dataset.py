@@ -21,13 +21,10 @@ from ..database import get_latest_dataset, save_dataset_record
 from ..logger import setup_logger
 from ..ml.analyzer import analyze_all_columns, get_target_recommendations
 from ..ml.csv_loader import (
-    CSVLoadResult,
-    TIER1_MAX_MB,
-    TIER2_MAX_MB,
     TIER3_MAX_MB,
+    CSVLoadResult,
     get_dataset_stats,
     load_csv,
-    optimize_memory,
 )
 from ..ml.detector import detect_problem_type, get_target_info
 
@@ -63,7 +60,9 @@ def _build_summary(df: pd.DataFrame, target_info: dict = None) -> dict:
         "dtypes": dtypes,
         "missing_values": missing_values,
         "total_missing": int(df.isnull().sum().sum()),
-        "numeric_columns": df.select_dtypes(include=["int64", "int32", "int16", "int8", "float64", "float32"]).columns.tolist(),
+        "numeric_columns": df.select_dtypes(
+            include=["int64", "int32", "int16", "int8", "float64", "float32"]
+        ).columns.tolist(),
         "categorical_columns": df.select_dtypes(include=["object", "category"]).columns.tolist(),
     }
     if target_info:
@@ -299,7 +298,7 @@ async def select_target(target_column: str = Form(...)):
 
     return {
         "message": (
-            f"Target column '{target_column}' selected. " f"Problem type: {problem_type.upper()}"
+            f"Target column '{target_column}' selected. Problem type: {problem_type.upper()}"
         ),
         "dataset_id": dataset_id,
         "target_column": target_column,

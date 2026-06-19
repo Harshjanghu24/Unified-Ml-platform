@@ -9,11 +9,11 @@ test:
 	cd frontend && npm test
 
 lint:
-	cd backend && ruff check . && black --check .
+	cd backend && ruff check . && ruff format --check .
 	cd frontend && npm run lint
 
 lint-fix:
-	cd backend && ruff check . --fix && black .
+	cd backend && ruff check . --fix && ruff format .
 	cd frontend && npm run lint -- --fix
 
 run-backend:
