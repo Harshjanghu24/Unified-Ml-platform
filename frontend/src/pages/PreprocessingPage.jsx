@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import {
   HiCog, HiDatabase, HiTable, HiCheckCircle, HiSearch, HiArrowRight,
-  HiInformationCircle, HiExclamationCircle, HiLightningBolt, HiCheck
+  HiExclamationCircle, HiLightningBolt
 } from 'react-icons/hi';
 import {
   getDatasetSummary,
@@ -88,7 +88,7 @@ export default function PreprocessingPage() {
           setReport(reportRes.data);
           setPreviewTab('processed');
         }
-      } catch (e) {
+      } catch {
         // No existing report
       }
     } catch (err) {
