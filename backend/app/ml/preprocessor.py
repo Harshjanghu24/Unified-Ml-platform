@@ -522,10 +522,7 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
     steps_log = []
     for k, v in res["preprocessing_report"].items():
         steps_log.append(f"{k.replace('_', ' ').capitalize()}: {v}")
-    steps_log.append(
-        f"Split data: {len(X_train)} training, "
-        f"{len(X_test)} testing samples (80/20)."
-    )
+    steps_log.append(f"Split data: {len(X_train)} training, {len(X_test)} testing samples (80/20).")
 
     # Build X_raw from the original data, but drop columns that the
     # preprocessing engine identified as identifiers, high-cardinality,
@@ -535,8 +532,7 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
     cols_to_drop_from_raw: list[str] = []
     # 1. Columns the engine explicitly marked for dropping
     dropped_by_engine = {
-        col for col, strat in res.get("column_strategies", {}).items()
-        if strat == "drop"
+        col for col, strat in res.get("column_strategies", {}).items() if strat == "drop"
     }
     # 2. ID-like columns (may be numeric, so the engine might not catch them)
     # 3. High-cardinality categorical columns (> 20 unique values)
@@ -552,9 +548,7 @@ def build_preprocessing_pipeline(df: pd.DataFrame, target_column: str, problem_t
         ) and df[col].nunique() > 20:
             cols_to_drop_from_raw.append(col)
 
-    X_raw = df.drop(
-        columns=[target_column] + cols_to_drop_from_raw
-    )
+    X_raw = df.drop(columns=[target_column] + cols_to_drop_from_raw)
 
     return {
         "X_train": X_train,
