@@ -39,6 +39,9 @@ TIER2_MAX_MB: int = 2_048  # Chunked + memory optimisation
 TIER3_MAX_MB: int = 10_240  # Chunked + sampling (10 GB)
 # Above TIER3 → rejected
 
+MAX_FILE_SIZE_MB: int = TIER3_MAX_MB  # Hard ceiling for upload rejection
+CHUNK_THRESHOLD_MB: int = TIER1_MAX_MB  # Trigger chunked reading above this
+
 MAX_COLUMNS: int = 2_000  # Reject absurdly wide files
 SAMPLE_BYTES: int = 32_768  # Bytes to sniff for delimiter / encoding
 CHUNK_ROWS: int = 100_000  # Rows per chunk when reading large files
@@ -125,10 +128,10 @@ def _validate_file(filepath: str) -> Optional[str]:
         return f"File not found: {filepath}"
 
     size_mb = os.path.getsize(filepath) / (1024 * 1024)
-    if size_mb > TIER3_MAX_MB:
+    if size_mb > MAX_FILE_SIZE_MB:
         return (
             f"File is too large ({size_mb:,.1f} MB / {size_mb / 1024:.1f} GB). "
-            f"Maximum allowed size is {TIER3_MAX_MB / 1024:.0f} GB. "
+            f"Maximum allowed size is {MAX_FILE_SIZE_MB / 1024:.0f} GB. "
             "Please reduce the file size before uploading."
         )
 
@@ -140,7 +143,7 @@ def _validate_file(filepath: str) -> Optional[str]:
 
 def _determine_tier(file_size_mb: float) -> int:
     """Classify the file into a processing tier."""
-    if file_size_mb <= TIER1_MAX_MB:
+    if file_size_mb <= CHUNK_THRESHOLD_MB:
         return 1
     elif file_size_mb <= TIER2_MAX_MB:
         return 2
@@ -621,10 +624,10 @@ def load_csv_from_bytes(content: bytes, filename: str = "<upload>") -> CSVLoadRe
         result.error = "The uploaded file is empty."
         return result
 
-    if result.file_size_mb > TIER3_MAX_MB:
+    if result.file_size_mb > MAX_FILE_SIZE_MB:
         result.error = (
             f"File is too large ({result.file_size_mb:.1f} MB). "
-            f"Maximum allowed size is {TIER3_MAX_MB / 1024:.0f} GB."
+            f"Maximum allowed size is {MAX_FILE_SIZE_MB / 1024:.0f} GB."
         )
         return result
 
